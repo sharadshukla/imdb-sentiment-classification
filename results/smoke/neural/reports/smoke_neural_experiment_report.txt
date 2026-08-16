@@ -1,0 +1,62 @@
+IMDb Sentiment Classification
+Neural Model Experiment Report
+================================================================================
+
+Model: RNN
+Parameters: 742,401
+Test Accuracy: 0.5120
+Test Precision: 0.5750
+Test Recall: 0.0920
+Test F1: 0.1586
+Final Training Loss: 0.6791
+Training Runtime: 2.06 minutes
+
+--------------------------------------------------------------------------------
+
+Model: LSTM
+Parameters: 1,433,601
+Test Accuracy: 0.4860
+Test Precision: 0.4923
+Test Recall: 0.8920
+Test F1: 0.6344
+Final Training Loss: 0.6917
+Training Runtime: 6.91 minutes
+
+--------------------------------------------------------------------------------
+
+Model: BiLSTM + FastText
+Parameters: 4,050,729
+Test Accuracy: 0.5000
+Test Precision: 0.5000
+Test Recall: 1.0000
+Test F1: 0.6667
+Final Training Loss: 0.6928
+Training Runtime: 27.70 minutes
+
+--------------------------------------------------------------------------------
+
+Model: Self-Attention
+Parameters: 586,753
+Test Accuracy: 0.5280
+Test Precision: 0.6750
+Test Recall: 0.1080
+Test F1: 0.1862
+Final Training Loss: 0.6860
+Training Runtime: 1.70 minutes
+
+--------------------------------------------------------------------------------
+
+FastText Preparation Runtime: 0.00 minutes
+
+Final Neural Model Comparison
+================================================================================
+
+            Model Accuracy Precision Recall F1 Score  Parameters Final Training Loss Runtime (min)
+BiLSTM + FastText   0.5000    0.5000 1.0000   0.6667     4050729              0.6928         27.70
+             LSTM   0.4860    0.4923 0.8920   0.6344     1433601              0.6917          6.91
+   Self-Attention   0.5280    0.6750 0.1080   0.1862      586753              0.6860          1.70
+              RNN   0.5120    0.5750 0.0920   0.1586      742401              0.6791          2.06
+
+================================================================================
+Total Experiment Runtime: 39.32 minutes
+================================================================================
