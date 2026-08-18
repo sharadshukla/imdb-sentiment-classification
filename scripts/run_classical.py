@@ -95,16 +95,12 @@ def get_output_directories(smoke_test):
     Return output directories for either a full run or smoke test.
     """
 
-    if smoke_test:
-        base_dir = PROJECT_ROOT / "results" / "smoke" / "classical"
-        figure_dir = base_dir / "figures"
-        metrics_dir = base_dir / "metrics"
-        report_dir = base_dir / "reports"
+    run_type = "smoke" if smoke_test else "full"
+    base_dir = PROJECT_ROOT / "results" / run_type / "classical"
 
-    else:
-        figure_dir = PROJECT_ROOT / "results" / "figures"
-        metrics_dir = PROJECT_ROOT / "results" / "metrics"
-        report_dir = PROJECT_ROOT / "results" / "reports"
+    figure_dir = base_dir / "figures"
+    metrics_dir = base_dir / "metrics"
+    report_dir = base_dir / "reports"
 
     figure_dir.mkdir(parents=True, exist_ok=True)
     metrics_dir.mkdir(parents=True, exist_ok=True)
