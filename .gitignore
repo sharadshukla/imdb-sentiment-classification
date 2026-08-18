@@ -16,3 +16,6 @@ Thumbs.db
 
 # Generated experiment artifacts
 results/
+
+# Original experimental notebooks - kept locally for reference
+notebooks/
