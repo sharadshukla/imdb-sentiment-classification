@@ -1,5 +1,0 @@
-Model,Accuracy,Precision,Recall,F1 Score,CV F1,Runtime (min)
-Logistic Regression,0.848,0.8385,0.862,0.8501,0.7926,0.24
-LinearSVC,0.838,0.8492,0.822,0.8354,0.7915,0.16
-Random Forest,0.823,0.8344,0.806,0.8199,0.7734,0.27
-Bernoulli Naive Bayes,0.821,0.8759,0.748,0.8069,0.7162,0.15
