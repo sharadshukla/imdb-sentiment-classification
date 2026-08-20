@@ -130,6 +130,39 @@ def artifact_exists(path):
         and path.stat().st_size > 0
     )
 
+def has_valid_sequence_lengths(lengths, max_len):
+    """
+    Check that sequence lengths are valid for packed recurrent models.
+
+    Every sequence must contain at least one real token and must not
+    exceed the configured maximum sequence length.
+    """
+
+    lengths = np.asarray(lengths)
+
+    if lengths.size == 0:
+        return False
+
+    return bool(
+        np.all(lengths > 0)
+        and np.all(lengths <= max_len)
+    )
+
+
+def has_zero_padding_embedding(weights):
+    """
+    Check that embedding row 0, reserved for PAD, is entirely zero.
+    """
+
+    if weights is None or len(weights) == 0:
+        return False
+
+    if hasattr(weights, "detach"):
+        pad_row = weights[0].detach().cpu().numpy()
+    else:
+        pad_row = np.asarray(weights[0])
+
+    return bool(np.allclose(pad_row, 0.0))
 
 class ValidationTracker:
     """

@@ -61,17 +61,20 @@ def train_model(
 
         total_loss = 0.0
 
-        for X, y in dataloader:
-
-            # Move data to CPU/GPU
+        for X, lengths, y in dataloader:
+            
+            # Move model inputs and labels to CPU/GPU
             X = X.to(device)
             y = y.to(device)
+
+            # Sequence lengths remain on CPU for packed recurrent sequences
+            lengths = lengths.cpu()
 
             # Clear gradients from previous step
             optimizer.zero_grad()
 
             # Forward pass
-            logits = model(X).squeeze(1)
+            logits = model(X, lengths).squeeze(1)
 
             # Compute binary classification loss
             loss = criterion(logits, y)
@@ -90,7 +93,7 @@ def train_model(
 
             total_loss += loss.item()
 
-        # Update learning rate after each epoch
+            # Update learning rate after each epoch
         if scheduler:
             scheduler.step()
 
@@ -104,7 +107,6 @@ def train_model(
         )
 
     return epoch_losses
-
 
 def make_scheduler(
     optimizer,

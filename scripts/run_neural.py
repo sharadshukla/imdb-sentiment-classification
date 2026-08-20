@@ -22,6 +22,7 @@ import re
 import sys
 import time
 
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -44,7 +45,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # Project imports
 # ---------------------------------------------------------------------
 
-from src.data import create_dataloaders, load_imdb_data
+from src.data import MAX_LEN, create_dataloaders, load_imdb_data
 from src.evaluation import evaluate_neural
 from src.neural_models import (
     RNNSentiment,
@@ -67,6 +68,8 @@ from src.utils import (
 )
 from src.validation import (
     ValidationTracker,
+    has_valid_sequence_lengths,
+    has_zero_padding_embedding,
     is_balanced,
     is_valid_metric,
     print_smoke_mode_banner,
@@ -605,6 +608,28 @@ def main():
             and len(test_loader) > 0
         )
 
+        validator.add(
+            "Training sequence lengths are valid",
+            has_valid_sequence_lengths(
+                train_ds.lengths,
+                MAX_LEN
+            )
+        )
+
+        validator.add(
+            "Test sequence lengths are valid",
+            has_valid_sequence_lengths(
+                test_ds.lengths,
+                MAX_LEN
+            )
+        )
+
+        validator.add(
+            "Variable-length sequences present",
+            any(length < MAX_LEN for length in train_ds.lengths)
+            and any(length < MAX_LEN for length in test_ds.lengths)
+        )
+
     criterion = nn.BCEWithLogitsLoss()
 
     all_results = []
@@ -684,12 +709,23 @@ def main():
         fasttext_start_time = time.perf_counter()
         fasttext_weights = create_smoke_embeddings(vocab_size)
 
+        if not has_zero_padding_embedding(fasttext_weights):
+            raise RuntimeError(
+                "Smoke embedding validation failed: "
+                "PAD embedding row must remain zero."
+            )
+
         fasttext_runtime = time.perf_counter() - fasttext_start_time
         fasttext_preparation_minutes = fasttext_runtime / 60
 
         validator.add(
             "BiLSTM embedding matrix created",
             fasttext_weights.shape == (vocab_size, 300)
+        )
+
+        validator.add(
+            "BiLSTM PAD embedding is zero",
+            has_zero_padding_embedding(fasttext_weights)
         )
 
         print(
@@ -706,6 +742,12 @@ def main():
 
         ft_model = load_fasttext_embeddings()
         fasttext_weights = build_embedding_matrix(word2idx, ft_model)
+
+        if not has_zero_padding_embedding(fasttext_weights):
+            raise RuntimeError(
+                "FastText embedding matrix validation failed: "
+                "PAD embedding row must remain zero."
+            )
 
         fasttext_runtime = time.perf_counter() - fasttext_start_time
         fasttext_preparation_minutes = fasttext_runtime / 60

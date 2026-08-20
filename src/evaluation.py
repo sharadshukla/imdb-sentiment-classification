@@ -151,8 +151,12 @@ def evaluate_neural(
     all_labels = []
 
     with torch.no_grad():
-        for X, y in dataloader:
-            logits = model(X.to(device)).squeeze(1)
+        for X, lengths, y in dataloader:
+            X = X.to(device)
+            lengths = lengths.cpu()
+
+            logits = model(X, lengths).squeeze(1)
+
             probabilities = torch.sigmoid(logits)
             predictions = (probabilities > 0.5).long()
 

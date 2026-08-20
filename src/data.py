@@ -52,11 +52,15 @@ class IMDBDataset(Dataset):
     Reviews longer than max_len are truncated.
     Shorter reviews are padded with the PAD token (ID 0).
     Unknown words are mapped to the UNK token (ID 1).
+
+    The true sequence length is preserved so recurrent models can ignore
+    padded positions during training and evaluation.
     """
 
     def __init__(self, texts, labels, word2idx, max_len=MAX_LEN):
         self.labels = labels
         self.seqs = []
+        self.lengths = []
 
         for doc in texts:
             ids = [
@@ -67,10 +71,18 @@ class IMDBDataset(Dataset):
             # Truncate long reviews
             ids = ids[:max_len]
 
+            # Avoid zero-length sequences for recurrent models
+            if not ids:
+                ids = [1]
+
+            # Preserve the true sequence length before padding
+            length = len(ids)
+
             # Pad short reviews
-            ids += [0] * (max_len - len(ids))
+            ids += [0] * (max_len - length)
 
             self.seqs.append(ids)
+            self.lengths.append(length)
 
     def __len__(self):
         return len(self.labels)
@@ -78,9 +90,9 @@ class IMDBDataset(Dataset):
     def __getitem__(self, idx):
         return (
             torch.tensor(self.seqs[idx], dtype=torch.long),
+            torch.tensor(self.lengths[idx], dtype=torch.long),
             torch.tensor(self.labels[idx], dtype=torch.float)
         )
-
 
 def create_dataloaders(
     train_texts,

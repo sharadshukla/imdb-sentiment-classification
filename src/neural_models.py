@@ -10,6 +10,7 @@ Models included:
 
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence
 
 from .data import MAX_LEN
 from .utils import positional_encoding, make_pad_mask
@@ -59,12 +60,20 @@ class RNNSentiment(nn.Module):
             1
         )
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         # Convert token IDs into dense word embeddings
         embedded_tokens = self.embedding(x)
 
-        # Process the sequence and obtain the final hidden states
-        _, h_n = self.rnn(embedded_tokens)
+        # Ignore right-padding when processing recurrent sequences
+        packed_tokens = pack_padded_sequence(
+            embedded_tokens,
+            lengths.cpu(),
+            batch_first=True,
+            enforce_sorted=False
+        )
+
+        # h_n now corresponds to the final real token of each sequence
+        _, h_n = self.rnn(packed_tokens)
 
         # Final hidden state from the last RNN layer
         final_hidden_state = h_n[-1]
@@ -74,7 +83,6 @@ class RNNSentiment(nn.Module):
         logits = self.fc(dropped_out)
 
         return logits
-
 
 class LSTMSentiment(nn.Module):
     """
@@ -120,12 +128,20 @@ class LSTMSentiment(nn.Module):
             out_features=1
         )
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         # Convert token IDs into dense word embeddings
         embedded_tokens = self.embedding(x)
 
-        # LSTM returns both hidden state h_n and cell state c_n
-        _, (h_n, c_n) = self.lstm(embedded_tokens)
+        # Ignore right-padding when processing recurrent sequences
+        packed_tokens = pack_padded_sequence(
+            embedded_tokens,
+            lengths.cpu(),
+            batch_first=True,
+            enforce_sorted=False
+        )
+
+        # h_n now corresponds to the final real token of each sequence
+        _, (h_n, _) = self.lstm(packed_tokens)
 
         # Final hidden state from the last LSTM layer
         final_hidden_state = h_n[-1]
@@ -135,7 +151,6 @@ class LSTMSentiment(nn.Module):
         logits = self.fc(dropped_out)
 
         return logits
-
 
 class BiLSTMSentiment(nn.Module):
     """
@@ -196,14 +211,22 @@ class BiLSTMSentiment(nn.Module):
             nn.Linear(hidden_dim, 1)
         )
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         # Convert token IDs into embeddings
         embedded_tokens = self.embedding(x)
 
-        # h_n contains hidden states from both directions
-        _, (h_n, c_n) = self.lstm(embedded_tokens)
+        # Ignore right-padding when processing recurrent sequences
+        packed_tokens = pack_padded_sequence(
+            embedded_tokens,
+            lengths.cpu(),
+            batch_first=True,
+            enforce_sorted=False
+        )
 
-        # Last forward and backward hidden states
+        # h_n contains the final hidden states from both directions
+        _, (h_n, _) = self.lstm(packed_tokens)
+
+        # Final forward and backward states from the last BiLSTM layer
         forward_hidden = h_n[-2]
         backward_hidden = h_n[-1]
 
@@ -217,7 +240,6 @@ class BiLSTMSentiment(nn.Module):
         output = self.classifier(combined)
 
         return output
-
 
 class SelfAttnSentiment(nn.Module):
     """
@@ -298,7 +320,7 @@ class SelfAttnSentiment(nn.Module):
         # Stores attention weights for later visualization
         self.last_weights = None
 
-    def forward(self, x):
+    def forward(self, x, lengths=None):
         # Token embeddings
         embedded_tokens = self.embedding(x)
 

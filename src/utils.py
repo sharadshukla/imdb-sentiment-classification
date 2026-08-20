@@ -100,7 +100,7 @@ def build_embedding_matrix(
 
     Words available in FastText receive their pretrained vectors.
     Words without a FastText vector remain randomly initialized.
-    The PAD token (index 0) receives a zero vector.
+    The PAD token (index 0) is always kept as a zero vector.
     """
 
     matrix = np.random.uniform(
@@ -109,15 +109,19 @@ def build_embedding_matrix(
         (len(word2idx), dim)
     ).astype(np.float32)
 
-    # PAD token = zero vector
-    matrix[0] = 0.0
-
     found = 0
 
     for word, idx in word2idx.items():
+        # PAD must remain a zero vector
+        if idx == 0:
+            continue
+
         if word in ft_model:
             matrix[idx] = ft_model[word]
             found += 1
+
+    # Explicitly enforce the PAD invariant after matrix construction
+    matrix[0] = 0.0
 
     coverage = found / len(word2idx) * 100
 
@@ -127,7 +131,6 @@ def build_embedding_matrix(
     )
 
     return torch.FloatTensor(matrix)
-
 
 def positional_encoding(max_len, d_model):
     """
@@ -163,7 +166,6 @@ def positional_encoding(max_len, d_model):
     )
 
     return pe.unsqueeze(0)
-
 
 def make_pad_mask(x):
     """
