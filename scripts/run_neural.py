@@ -405,7 +405,8 @@ def save_experiment_artifacts(
     figure_dir,
     metrics_dir,
     report_dir,
-    smoke_test
+    smoke_test,
+    experiment_metadata
 ):
     """
     Persist neural experiment artifacts.
@@ -423,7 +424,8 @@ def save_experiment_artifacts(
         all_results,
         json_path,
         total_runtime_minutes,
-        fasttext_preparation_minutes
+        fasttext_preparation_minutes,
+        metadata=experiment_metadata
     )
 
     save_neural_experiment_report(
@@ -634,6 +636,22 @@ def main():
 
     all_results = []
     loss_histories = {}
+
+    experiment_metadata = {
+        "run_type": "smoke" if args.smoke_test else "full",
+        "train_samples": len(train_ds),
+        "test_samples": len(test_ds),
+        "epochs": n_epochs,
+        "max_sequence_length": MAX_LEN,
+        "vocabulary_size": vocab_size,
+        "seed": SEED,
+        "device": str(device),
+        "fasttext_embeddings": (
+            "temporary_random_300d"
+            if args.smoke_test
+            else "pretrained_fasttext_300d"
+        )
+    }
 
     # -----------------------------------------------------------------
     # 4. RNN
@@ -886,7 +904,8 @@ def main():
         figure_dir,
         metrics_dir,
         report_dir,
-        args.smoke_test
+        args.smoke_test,
+        experiment_metadata
     )
 
     # -----------------------------------------------------------------

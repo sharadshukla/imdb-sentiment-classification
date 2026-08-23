@@ -320,7 +320,7 @@ class SelfAttnSentiment(nn.Module):
         # Stores attention weights for later visualization
         self.last_weights = None
 
-    def forward(self, x, lengths=None):
+    def forward(self, x, lengths=None, capture_attention=False):
         # Token embeddings
         embedded_tokens = self.embedding(x)
 
@@ -352,12 +352,15 @@ class SelfAttnSentiment(nn.Module):
             seq,
             seq,
             key_padding_mask=make_pad_mask(x),
-            need_weights=True,
+            need_weights=capture_attention,
             average_attn_weights=True
         )
 
-        # Save attention weights for visualization
-        self.last_weights = weights.detach().cpu()
+        # Save attention weights only when explicitly requested
+        if capture_attention and weights is not None:
+            self.last_weights = weights.detach().cpu()
+        else:
+            self.last_weights = None
 
         # CLS representation summarizes the review
         cls_repr = self.norm2(
