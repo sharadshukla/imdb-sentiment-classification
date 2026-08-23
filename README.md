@@ -119,6 +119,17 @@ These are intentionally separated from v1 so that the current repository can fir
 
 ## Quick Start
 
+### Tested Environment
+
+This v1.0 release has been tested with:
+
+- **Python:** 3.13.14
+- **Operating system:** Windows
+- **Execution:** CPU; CUDA is automatically used when available for neural experiments
+- **Dependencies:** pinned in `requirements.txt`
+
+> **Compatibility note:** Python 3.14 is currently not recommended for this release because the FastText/Gensim dependency path previously encountered compatibility issues with that version.
+
 Clone the repository:
 
 ```bash
