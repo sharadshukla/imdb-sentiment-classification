@@ -218,7 +218,7 @@ results/
 
 ## Dataset
 
-This project uses the **Stanford IMDb Large Movie Review Dataset**, a balanced benchmark dataset for binary sentiment classification.
+This project uses the **[Stanford IMDb Large Movie Review Dataset](https://ai.stanford.edu/~amaas/data/sentiment/)**, a balanced benchmark dataset for binary sentiment classification introduced by Maas et al.
 
 The labelled portion used in this project contains:
 
@@ -229,7 +229,7 @@ The labelled portion used in this project contains:
 
 Each review is labelled as either **positive (`1`)** or **negative (`0`)**.
 
-The dataset is loaded programmatically through the Hugging Face `datasets` library:
+The dataset is loaded programmatically through the Hugging Face `datasets` library using the [`stanfordnlp/imdb`](https://huggingface.co/datasets/stanfordnlp/imdb) dataset:
 
 ```python
 dataset = load_dataset("stanfordnlp/imdb")
@@ -548,7 +548,7 @@ imdb-sentiment-classification/
 │   ├── architecture/
 │   │   └── README.md
 │   ├── images/
-│   │   └── experiment-architecture.svg
+│   │   └── experiment-architecture.png
 │   └── experiment_analysis.md
 │
 ├── requirements.txt
@@ -656,7 +656,7 @@ All four neural architectures are exercised:
 The current smoke-test result is:
 
 ```text
-Result: 31/31 checks passed
+Result: 35/35 checks passed
 
 SMOKE TEST: PASSED
 ```
@@ -679,6 +679,9 @@ The checks cover:
 - training-loss CSV generation
 - combined loss-comparison figure
 - experiment report generation
+- valid training and test sequence lengths
+- presence of variable-length sequences
+- zero-valued PAD embedding for the BiLSTM embedding matrix
 
 ---
 
@@ -1325,7 +1328,7 @@ The repository extends that work by reorganizing the experiment into a modular a
 
 ### Dataset
 
-The sentiment-classification experiments use the **Stanford IMDb Large Movie Review Dataset**, originally introduced for research on learning word vectors for sentiment analysis.
+The sentiment-classification experiments use the **[Stanford IMDb Large Movie Review Dataset](https://ai.stanford.edu/~amaas/data/sentiment/)**, introduced by Maas et al. in *Learning Word Vectors for Sentiment Analysis*.
 
 ### Libraries and Ecosystem
 
@@ -1334,7 +1337,7 @@ The implementation builds on open-source tools including:
 - PyTorch
 - scikit-learn
 - Hugging Face Datasets
-- FastText
+- [FastText](https://fasttext.cc/)
 - NumPy
 - pandas
 - Matplotlib
