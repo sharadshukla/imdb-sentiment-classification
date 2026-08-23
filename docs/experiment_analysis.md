@@ -429,7 +429,7 @@ Classification head
 
 The repository uses the term **Self-Attention** because the queries, keys, and values are derived from the same sequence.
 
-The model also provides attention weights for later inspection, which creates an additional interpretability tool not present in the recurrent baselines.
+The model also provides attention weights for later inspection, offering an additional diagnostic view of learned token relationships that is not available in the recurrent baselines. These weights are useful for inspecting attention patterns, but they should not be interpreted as complete explanations of the model's predictions.
 
 ---
 
@@ -442,4 +442,474 @@ The neural results make the difference between **fitting the training data** and
 | BiLSTM + FastText | **0.0390** | 0.7813 |
 | Self-Attention | 0.2022 | **0.8601** |
 | LSTM | 0.4207 | 0.7906 |
-| Vanilla RNN | 0.6976
+| Vanilla RNN | 0.6976 | 0.4874 |
+
+If training loss alone were used to select the model, BiLSTM + FastText would appear overwhelmingly superior.
+
+The held-out test result tells a different story.
+
+Self-Attention finished with a substantially higher training loss (`0.2022`) but achieved much better test F1 (`0.8601`).
+
+This is why the experiment needs both types of evidence:
+
+```text
+Training loss
+     ↓
+How strongly did the model fit the training objective?
+
+Held-out metrics
+     ↓
+How well did that learned behavior transfer to unseen reviews?
+```
+
+The BiLSTM result is consistent with overfitting or, more cautiously, a **generalization gap**. Because the experiment did not maintain a dedicated validation-loss curve for model selection, the exact onset and magnitude of overfitting cannot be established precisely from the available evidence.
+
+The defensible conclusion is therefore:
+
+> The BiLSTM + FastText model fit the training data much more strongly than the other neural models, but this did not translate into better held-out performance.
+
+---
+
+## 7. Classical vs Neural Models
+
+Combining the reference results gives:
+
+| Model | Family | F1 Score |
+|---|---|---:|
+| **LinearSVC** | Classical | **0.8750** |
+| Logistic Regression | Classical | 0.8748 |
+| Self-Attention | Neural | 0.8601 |
+| Random Forest | Classical | 0.8544 |
+| Bernoulli Naive Bayes | Classical | 0.8117 |
+| LSTM | Neural | 0.7906 |
+| BiLSTM + FastText | Neural | 0.7813 |
+| Vanilla RNN | Neural | 0.4874 |
+
+### Complexity did not automatically win
+
+The strongest result in the complete comparison came from LinearSVC, not from the largest or most sophisticated neural architecture.
+
+Logistic Regression was essentially tied with it.
+
+This is an important result because sparse bag-of-words-style representations can be extremely effective for sentiment classification when the presence of discriminative words and phrases already carries strong predictive information.
+
+A neural model may learn richer sequence-dependent representations, but that additional representational power is useful only if it translates into better generalization for the task and training setup.
+
+### Self-Attention came closest
+
+Self-Attention was the only neural model that approached the strongest classical baselines:
+
+```text
+LinearSVC F1          : 0.8750
+Logistic Regression F1: 0.8748
+Self-Attention F1     : 0.8601
+```
+
+The gap between Self-Attention and LinearSVC was `0.0149`.
+
+That is a much smaller gap than the one between the linear models and the recurrent neural baselines.
+
+### Practical model choice
+
+If the decision were based only on the evidence generated in these experiments, LinearSVC would be a strong practical candidate because it combines:
+
+- the highest observed held-out F1
+- relatively low architectural complexity
+- efficient inference
+- straightforward deployment
+- no GPU requirement for inference
+- simpler operational maintenance than the neural alternatives
+
+This does **not** make the neural experiments unnecessary.
+
+The neural models expose different learning mechanisms and provide useful evidence about recurrent memory, pretrained embeddings, bidirectional context, attention, model capacity, and generalization.
+
+The best engineering choice and the most educational model are not necessarily the same thing.
+
+---
+
+## 8. Error Analysis
+
+Aggregate metrics show how often the model is correct. Error analysis helps explain **why** it is wrong.
+
+The strongest overall model, LinearSVC, was inspected through false-positive and false-negative examples.
+
+### Mixed sentiment
+
+Several errors involved reviews that contain both positive and negative language.
+
+Some negative reviews contained locally positive expressions such as:
+
+```text
+"worth the entertainment value"
+"entertaining"
+"decent film"
+```
+
+while the overall review remained critical.
+
+A sparse text classifier can learn that these terms correlate with positive sentiment without fully representing how the surrounding review changes their meaning.
+
+The reverse problem also occurs: a positive review may discuss dark, unpleasant, violent, or otherwise negative subject matter while the reviewer is actually praising the film.
+
+### False positives
+
+A false positive occurs when:
+
+```text
+Actual sentiment    : Negative
+Predicted sentiment : Positive
+```
+
+Mixed reviews are a natural source of this error. Positive local vocabulary can dominate the feature representation even when the writer's final judgement is negative.
+
+### False negatives
+
+A false negative occurs when:
+
+```text
+Actual sentiment    : Positive
+Predicted sentiment : Negative
+```
+
+This can happen when the review contains many negative-sounding words because of the film's subject matter, criticism of particular elements, or a contrastive writing style, even though the overall judgement is favorable.
+
+### What the errors reveal
+
+The errors highlight a limitation shared in different ways by several models:
+
+> **Detecting sentiment-bearing words is not the same as understanding the sentiment of the complete review.**
+
+Long reviews can contain:
+
+- contrast
+- qualification
+- mixed praise and criticism
+- narrative description
+- sarcasm
+- sentiment shifts
+- negative subject matter described positively
+
+The model must eventually compress all of that into one binary decision.
+
+---
+
+## 9. Attention Analysis
+
+The Self-Attention experiment also inspected attention weights for selected reviews.
+
+The implemented model prepends a learnable classification token (`CLS`) and uses the resulting `CLS` representation for sentiment prediction. The attention weights provide a useful way to inspect which token relationships received relatively greater emphasis inside the attention mechanism.
+
+### Correct Classifications
+
+In some correctly classified examples, higher attention weights appeared around evaluative or sentiment-bearing expressions.
+
+This was especially visible when strongly positive or negative words were consistent with the overall sentiment of the review.
+
+These patterns are useful as diagnostic evidence because they show that semantically relevant parts of the review can receive stronger attention during processing.
+
+### Misclassifications
+
+Misclassified examples also revealed an important limitation.
+
+Some reviews contained locally positive or negative expressions that did not represent the overall sentiment of the complete review.
+
+In such cases, relatively strong attention could appear around these local sentiment-bearing expressions even though the broader review expressed a different conclusion.
+
+This mirrors the mixed-sentiment problem observed during the classical-model error analysis.
+
+Reviews containing contrast, mixed praise and criticism, sarcasm, or sentiment shifts can therefore remain difficult even when the model identifies locally meaningful relationships.
+
+### Attention Is Evidence, Not a Complete Explanation
+
+A high attention weight tells us that a token relationship received greater emphasis within the model's attention computation.
+
+It does not by itself prove:
+
+```text
+"This word caused the prediction."
+```
+
+or:
+
+```text
+"The model understands this word exactly as a person would."
+```
+
+The final prediction emerges from the complete learned representation rather than from the attention weights alone.
+
+In this implementation, the prediction is produced through:
+
+```text
+Token Embeddings
+       +
+Positional Information
+        ↓
+Multi-Head Self-Attention
+        ↓
+Attention-Transformed Representations
+        ↓
+CLS Representation
+        ↓
+Normalization
+        ↓
+Classification Layers
+        ↓
+Sentiment Prediction
+```
+
+The learned token embeddings, positional information, attention-transformed representations, aggregated `CLS` representation, and downstream classification layers all contribute to the final output.
+
+Attention visualization is therefore best treated as a **diagnostic and interpretability aid**. It can help identify patterns worth investigating and generate hypotheses about model behavior, but it should not be treated as a complete causal explanation of why a particular prediction was made.
+
+### Main Takeaway
+
+The attention analysis provides two useful lessons:
+
+1. Self-Attention can model relationships between different positions in a review without relying on recurrent information flow.
+2. Attention weights can help inspect model behavior, but they must be interpreted together with the complete learned representation and the overall review context.
+
+---
+
+## 10. What the Experiments Demonstrate
+
+The completed experiments support several useful conclusions.
+
+### Strong classical baselines matter
+
+LinearSVC and Logistic Regression achieved the two strongest held-out F1 scores.
+
+A sophisticated neural architecture should therefore be compared against strong classical baselines rather than assumed to be superior because it is newer or more complex.
+
+### LSTM gating made a large practical difference
+
+Under the implemented configuration, moving from Vanilla RNN to LSTM improved F1 from `0.4874` to `0.7906`.
+
+The training curves also changed from near-stagnation to sustained learning.
+
+### Training fit and generalization are different
+
+BiLSTM + FastText achieved the lowest training loss by a large margin but did not produce the strongest test result.
+
+The experiment gives a concrete example of why training loss cannot be used as the sole model-selection criterion.
+
+### More parameters did not guarantee better performance
+
+BiLSTM + FastText had the largest trainable parameter count, yet its held-out F1 was below the simpler LSTM and far below Self-Attention.
+
+Capacity is useful only when it is converted into generalizable behavior.
+
+### Self-Attention was the strongest neural architecture
+
+Self-Attention reached `0.8601` F1 and was the only neural model to approach the strongest classical baselines.
+
+### Model choice is an engineering decision
+
+A final model should not be selected by F1 alone.
+
+Relevant considerations include:
+
+- held-out predictive quality
+- stability across runs
+- training cost
+- inference cost
+- model size
+- hardware requirements
+- interpretability needs
+- operational complexity
+- maintainability
+
+For the evidence available in this project, LinearSVC offers a particularly strong balance.
+
+---
+
+## 11. What the Experiments Do Not Establish
+
+A useful experiment analysis should also state what cannot be concluded.
+
+### The neural architectures were not exhaustively tuned
+
+The neural experiments were designed to compare modeling approaches, not to find the maximum achievable score for every architecture.
+
+Therefore, the results should not be interpreted as:
+
+> "LSTM can only achieve 0.7906 F1 on IMDb."
+
+They show what the implemented LSTM configuration achieved in this experiment.
+
+### BiLSTM and FastText effects cannot be separated
+
+Bidirectionality and pretrained embeddings were introduced together.
+
+The result therefore cannot tell us whether the observed behavior came primarily from:
+
+- bidirectionality
+- FastText
+- the combination
+- the larger parameter count
+- interactions with the training configuration
+
+A controlled ablation is needed.
+
+### The neural test set is not a validation set
+
+The neural workflow does not include a dedicated validation split for decisions such as epoch selection, learning-rate tuning, regularization, or early stopping.
+
+A more rigorous model-development workflow would reserve validation data for those decisions and use the test set only once for final evaluation.
+
+### One run does not measure neural variance
+
+Neural training is stochastic.
+
+The reference scores describe completed runs, not a distribution across random seeds.
+
+Repeated experiments would be needed to estimate mean performance and variance.
+
+### Attention weights are not causal explanations
+
+The attention visualization provides insight into model behavior but does not establish that highly weighted tokens alone caused a prediction.
+
+### The comparison does not prove a universal ranking
+
+The results are specific to:
+
+- this dataset
+- these representations
+- these model implementations
+- these hyperparameters
+- these training procedures
+
+They do not imply that LinearSVC universally outperforms neural sentiment models or that Self-Attention universally outperforms LSTM.
+
+---
+
+## 12. Useful Follow-Up Experiments
+
+The existing results suggest several controlled experiments that would deepen the analysis without changing the purpose of v1.
+
+### Separate bidirectionality from FastText
+
+A useful ablation matrix would be:
+
+| Recurrent Direction | Embeddings |
+|---|---|
+| LSTM | learned/random |
+| BiLSTM | learned/random |
+| LSTM | FastText |
+| BiLSTM | FastText |
+
+This would allow the effect of bidirectionality and pretrained embeddings to be measured independently.
+
+### Add validation-based early stopping
+
+Track training and validation loss together and stop when validation performance no longer improves.
+
+This would be especially useful for investigating the BiLSTM generalization gap.
+
+### Tune neural regularization
+
+Potential variables include:
+
+- dropout
+- weight decay
+- learning rate
+- learning-rate schedule
+- hidden dimension
+- number of layers
+
+### Compare sequence lengths
+
+The current maximum sequence length is `400`.
+
+Testing shorter and longer limits could reveal the trade-off between:
+
+- retained context
+- compute cost
+- recurrent difficulty
+- truncation loss
+
+### Repeat neural runs across random seeds
+
+Rather than comparing one score per model, repeated runs could report:
+
+```text
+mean F1 ± standard deviation
+```
+
+This would make the neural comparison statistically more informative.
+
+### Add stronger representation baselines
+
+A later experiment could compare `CountVectorizer` with alternatives such as TF-IDF while keeping the classifier fixed.
+
+That would isolate the effect of representation from classifier choice.
+
+These are follow-up experiments, not missing requirements for the current repository.
+
+---
+
+## 13. Key Learnings
+
+The most useful outcome of the project is not one winning score. It is the set of modeling lessons exposed by the comparison.
+
+1. **Always establish strong simple baselines.**  
+   LinearSVC and Logistic Regression remained stronger than all neural models in the completed comparison.
+
+2. **Accuracy alone is not enough.**  
+   Precision, recall, F1, confusion matrices, and class-specific error behavior reveal different aspects of a classifier.
+
+3. **Cross-validation and held-out testing serve different purposes.**  
+   Model selection should happen before final test evaluation.
+
+4. **Vanilla recurrence can struggle on long sequences.**  
+   The RNN's near-flat loss and chance-level performance made this limitation visible in practice.
+
+5. **Gating can materially improve recurrent learning.**  
+   The LSTM showed a large improvement over the basic RNN under the same task.
+
+6. **Lower training loss is not the same as better generalization.**  
+   BiLSTM + FastText provided the clearest example.
+
+7. **More parameters do not guarantee better results.**  
+   The largest neural model was not the strongest held-out classifier.
+
+8. **Attention can improve contextual modeling without solving every semantic problem.**  
+   Self-Attention was the strongest neural model, yet mixed-sentiment reviews remained challenging.
+
+9. **Interpretability tools should be used carefully.**  
+   Attention weights can help inspect model behavior but are not complete causal explanations.
+
+10. **Model selection is ultimately an engineering trade-off.**  
+    Predictive performance has to be considered together with compute, inference requirements, complexity, and maintainability.
+
+---
+
+## Final Perspective
+
+The experiment started as a comparison of sentiment-classification models, but the most valuable result is broader.
+
+It demonstrates why machine-learning evaluation should move beyond the question:
+
+> **Which model is the most sophisticated?**
+
+toward:
+
+> **Which model learned useful behavior, generalized to unseen data, and provides an appropriate trade-off for the problem we are actually solving?**
+
+For this experiment, the answer is nuanced:
+
+- **LinearSVC** produced the strongest observed held-out F1.
+- **Logistic Regression** was essentially tied while remaining very efficient.
+- **Self-Attention** was the strongest neural model.
+- **LSTM** demonstrated the practical value of gated recurrence over a basic RNN.
+- **BiLSTM + FastText** demonstrated that an extremely low training loss can coexist with weaker held-out generalization.
+- **Vanilla RNN** provided a useful failure case showing that architectural simplicity is not always sufficient for long-sequence learning.
+
+Together, those outcomes provide a more useful learning record than a single winning metric.
+
+---
+
+**Related documentation**
+
+- [Project README](../README.md)
+- [Architecture Documentation](architecture/README.md)

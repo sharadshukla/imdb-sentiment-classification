@@ -900,7 +900,9 @@ The model substantially outperformed the Vanilla RNN, LSTM, and BiLSTM + FastTex
 
 Unlike the recurrent models, Self-Attention allows different positions in the review to interact directly rather than requiring information to pass sequentially through every preceding timestep.
 
-The experiment also visualized attention weights. Correct classifications often showed attention around useful evaluative or sentiment-bearing terms, while some misclassified reviews showed the model focusing on locally positive or negative words that did not fully represent the overall sentiment of the review.
+The experiment also visualized attention weights. The experiment also inspected attention-weight patterns for selected examples. In some correctly classified reviews, higher attention weights appeared around evaluative or sentiment-bearing terms. In some misclassified reviews, stronger attention was observed around locally positive or negative expressions that did not align with the overall review sentiment.
+
+These attention patterns are treated as **diagnostic signals rather than definitive explanations of model decisions**. They can help inspect which token relationships received stronger attention, but attention weights alone do not establish why a prediction was made. The final prediction emerges from the complete learned representation, including token embeddings, positional information, attention-transformed representations, the aggregated `CLS` representation, and the downstream classification layers.
 
 ---
 
