@@ -119,41 +119,91 @@ These are intentionally separated from v1 so that the current repository can fir
 
 ## Quick Start
 
-Clone the repository and create a Python environment:
+Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/sharadshukla/imdb-sentiment-classification.git
 cd imdb-sentiment-classification
+```
 
+### 1. Create a virtual environment
+
+```bash
 python -m venv .venv
 ```
 
-Activate the environment and install the dependencies:
+### 2. Activate the environment
+
+**Windows — PowerShell**
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+**Windows — Command Prompt**
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+**macOS / Linux**
 
 ```bash
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-For a quick end-to-end validation, run one of the smoke tests:
+### 4. Run a smoke test
+
+For the quickest end-to-end validation, start with the classical pipeline:
 
 ```bash
 python scripts/run_experiment.py --mode classical --smoke-test
 ```
 
-or:
+To validate the complete neural pipeline:
 
 ```bash
 python scripts/run_experiment.py --mode neural --smoke-test
 ```
 
-For the complete experiments:
+The smoke tests use reduced workloads and are intended to verify pipeline integration rather than benchmark model performance.
+
+### 5. Run the full experiments
+
+Full classical experiment:
 
 ```bash
 python scripts/run_experiment.py --mode classical
+```
+
+Full neural experiment:
+
+```bash
 python scripts/run_experiment.py --mode neural
 ```
 
-> **Recommended first run:** start with the classical smoke test. It validates the complete classical pipeline with a reduced workload before running the more computationally expensive full experiments.
+The neural runner automatically uses a CUDA GPU when available and otherwise falls back to CPU.
+
+> **Recommended workflow:** run the corresponding smoke test successfully before launching a full experiment. The full neural experiment is substantially faster on a CUDA-capable GPU.
+
+Generated artifacts are written under:
+
+```text
+results/
+├── full/
+│   ├── classical/
+│   └── neural/
+└── smoke/
+    ├── classical/
+    └── neural/
+```
 
 ## Dataset
 

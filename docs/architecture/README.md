@@ -4,6 +4,9 @@ This document describes how the IMDb Sentiment Classification repository is stru
 
 For project purpose, quick start, headline results, and general usage, return to the **[root README](../../README.md)**.
 
+For environment setup and experiment commands, see the
+**[Quick Start](../../README.md#quick-start)** in the root README.
+
 For deeper ML interpretation, see **[Detailed Experiment Analysis](../experiment_analysis.md)**.
 
 ---
@@ -47,7 +50,7 @@ Both paths eventually converge on the same goal: evaluate the trained models and
 ### Experiment Workflow
 
 <p align="center">
-  <img src="../images/experiment-architecture.svg"
+  <img src="../images/experiment-architecture.png"
        alt="IMDb sentiment classification experiment architecture"
        width="900">
 </p>
@@ -130,7 +133,7 @@ flowchart TD
     I --> J["Validation checks"]
     J --> K["Smoke-test artifacts"]
 
-    G --> L["results/classical or results/neural"]
+    G --> L["results/full/classical or results/full/neural"]
     K --> M["results/smoke/..."]
 ```
 
@@ -302,8 +305,9 @@ The project keeps the two artifact types separate:
 ```text
 results/
 │
-├── classical/       ← full classical experiment
-├── neural/          ← full neural experiment
+├── full/   
+|   ├── classical/  ← full classical experiment
+|   └── neural/     ← full neural experiment
 │
 └── smoke/
     ├── classical/   ← classical pipeline validation
