@@ -60,17 +60,6 @@ from src.validation import (
 )
 
 # ---------------------------------------------------------------------
-# Experiment Metadata
-# ---------------------------------------------------------------------
-
-experiment_metadata = {
-    "run_type": "smoke" if args.smoke_test else "full",
-    "train_samples": len(train_texts_clean),
-    "test_samples": len(test_texts_clean),
-    "cv_folds": SMOKE_CV_FOLDS if args.smoke_test else 5
-}
-
-# ---------------------------------------------------------------------
 # Smoke-test configuration
 # ---------------------------------------------------------------------
 
