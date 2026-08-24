@@ -272,187 +272,280 @@ The small differences between CV and test performance are not evidence that the 
 
 ---
 
-## 5. Neural-Network Analysis
+## 5. Neural Model Results
 
-### Overall results
+The finalized neural experiment trained and evaluated four architectures on the full Stanford IMDb dataset:
+
+- Vanilla RNN
+- LSTM
+- BiLSTM with pretrained FastText embeddings
+- Self-Attention
+
+All four models were trained for 10 epochs and evaluated on the 25,000-review test split.
+
+The final results were:
 
 | Model | Accuracy | Precision | Recall | F1 Score | Trainable Parameters | Final Training Loss |
 |---|---:|---:|---:|---:|---:|---:|
-| **Self-Attention** | **0.8629** | **0.8782** | **0.8427** | **0.8601** | 3,802,753 | 0.2022 |
-| **LSTM** | 0.7903 | 0.7897 | 0.7914 | 0.7906 | 4,649,601 | 0.4207 |
-| **BiLSTM + FastText** | 0.7959 | 0.8416 | 0.7291 | 0.7813 | 11,588,229 | **0.0390** |
-| **Vanilla RNN** | 0.4968 | 0.4967 | 0.4785 | 0.4874 | 3,958,401 | 0.6976 |
+| **Self-Attention** | **0.8636** | 0.8722 | 0.8519 | **0.8620** | 3,802,753 | 0.2010 |
+| **LSTM** | 0.8622 | **0.8735** | 0.8470 | 0.8601 | 4,649,601 | 0.0339 |
+| **BiLSTM + FastText** | 0.8476 | 0.8375 | **0.8624** | 0.8498 | 11,588,229 | 0.0147 |
+| **Vanilla RNN** | 0.7802 | 0.7861 | 0.7699 | 0.7779 | 3,958,401 | 0.4436 |
 
-The neural results reveal several distinct behaviors rather than one simple progression where every more sophisticated model performs better.
+### Impact of the recurrent sequence-handling correction
 
-### Vanilla RNN: training largely stalled
+The recurrent sequence-handling correction materially changed the results of the recurrent models, while Self-Attention remained essentially unchanged because it already masked padded positions during attention.
 
-The Vanilla RNN remained close to chance performance in the completed reference experiment:
+| Model | Earlier F1 | Finalized F1 | Change |
+|---|---:|---:|---:|
+| Vanilla RNN | 0.4874 | 0.7779 | **+0.2905** |
+| LSTM | 0.7906 | 0.8601 | **+0.0695** |
+| BiLSTM + FastText | 0.7813 | 0.8498 | **+0.0685** |
+| Self-Attention | 0.8601 | 0.8620 | +0.0019 |
+
+This before-and-after comparison is an important part of the experiment: the implementation was corrected, the full neural workflow was rerun, and the interpretation was revised based on the new evidence.
+
+### Vanilla RNN: meaningful learning after sequence-handling correction
+
+The finalized Vanilla RNN achieved:
 
 ```text
-Accuracy : 0.4968
-F1       : 0.4874
+Accuracy : 0.7802
+Precision: 0.7861
+Recall   : 0.7699
+F1       : 0.7779
 ```
 
-Its loss changed only slightly across the ten epochs:
+<p align="center">
+  <img src="images/experiment-results/rnn_confusion_matrix.png"
+       alt="Confusion matrix for the finalized Vanilla RNN"
+       width="620">
+</p>
+
+The confusion matrix shows that the corrected RNN now makes meaningful predictions for both classes rather than collapsing toward chance-level behavior.
+
+Its training loss decreased from:
 
 ```text
-Epoch 1  : 0.7007
-Epoch 10 : 0.6976
+Epoch 1  : 0.6599
+Epoch 10 : 0.4436
 ```
 
-The loss effectively plateaued instead of showing sustained convergence.
+The loss trajectory was less smooth than those of the other neural models, with temporary increases during the middle epochs, but the overall trend showed substantial learning.
 
-This result shows that the Vanilla RNN did not learn the sentiment-classification task effectively under the configuration used in the reference experiment.
-
-Vanilla RNNs can have difficulty preserving and learning information across long sequences because useful signals and gradients must propagate through many recurrent steps. Since IMDb reviews can contain long-range sentiment dependencies, this is a plausible contributing factor to the observed behavior.
-
-However, the near-chance result should **not be attributed solely to long-sequence limitations**. The reference experiment used an earlier recurrent-sequence implementation, and the modular v1 code has since been improved to use true sequence lengths and packed recurrent processing so that padded timesteps do not influence the final recurrent representation.
-
-The final full neural experiment will therefore provide a cleaner basis for interpreting the Vanilla RNN's behavior under the corrected implementation.
-
-### LSTM: a major improvement over the basic RNN
-
-In the completed reference experiment, the LSTM achieved:
+This result is particularly important because an earlier implementation produced near-chance performance:
 
 ```text
-Accuracy : 0.7903
-Precision: 0.7897
-Recall   : 0.7914
-F1       : 0.7906
+Earlier RNN F1    : 0.4874
+Finalized RNN F1  : 0.7779
+Difference        : +0.2905
 ```
 
-Compared with the Vanilla RNN:
+The earlier recurrent implementation processed fixed-length padded sequences without ensuring that the final recurrent representation corresponded to each review's last real token. Consequently, padded timesteps could influence the representation used for classification.
+
+The finalized implementation tracks the true sequence lengths and uses packed recurrent processing, allowing the RNN to operate on the meaningful portion of each review rather than treating padded timesteps as part of the sequence.
+
+The substantial improvement after this correction demonstrates an important experimental lesson:
+
+> **Implementation details in sequence handling can materially affect model performance and can confound conclusions about the underlying architecture.**
+
+The earlier near-chance result therefore should not be interpreted primarily as evidence that Vanilla RNNs are incapable of learning sentiment from long reviews. Under the corrected implementation, the RNN learned a meaningful classifier, although it still remained the weakest of the four neural architectures.
+
+### LSTM: strong performance with gated recurrence
+
+The finalized LSTM achieved:
 
 ```text
-Vanilla RNN F1 : 0.4874
-LSTM F1        : 0.7906
-Difference     : +0.3032
-```
-
-Its training loss also behaved very differently:
-
-```text
-Epoch 1  : 0.6934
-Epoch 10 : 0.4207
-```
-
-Unlike the Vanilla RNN in the reference experiment, the LSTM continued learning across the training period.
-
-This result is consistent with the expected advantage of gated recurrence: the LSTM cell state and gating mechanisms provide additional control over what information is retained, updated, and forgotten while processing a sequence.
-
-However, the exact size of the observed RNN-to-LSTM performance gap should be interpreted cautiously because the reference experiment used the earlier recurrent-sequence implementation. The modular v1 implementation has since been corrected to use true sequence lengths and packed recurrent processing so that padded timesteps do not affect the final recurrent representation.
-
-The final full neural rerun will therefore provide the appropriate basis for determining how much of the RNN-to-LSTM performance difference remains under the corrected implementation.
-
-### BiLSTM + FastText: excellent training fit, weaker generalization
-
-The BiLSTM experiment introduced two changes together:
-
-1. bidirectional recurrence
-2. pretrained 300-dimensional FastText embeddings
-
-In the completed reference experiment, its held-out result was:
-
-```text
-Accuracy : 0.7959
-Precision: 0.8416
-Recall   : 0.7291
-F1       : 0.7813
-```
-
-Its training loss fell dramatically:
-
-```text
-Epoch 1  : 0.5639
-Epoch 5  : 0.1310
-Epoch 10 : 0.0390
-```
-
-The model therefore fit the training data very strongly. However, its held-out F1 (`0.7813`) remained slightly below the LSTM result (`0.7906`) in the reference experiment.
-
-This provides an important general lesson:
-
-> **A lower training loss does not necessarily imply better generalization.**
-
-The BiLSTM + FastText model also had approximately `11.6 million` trainable parameters, substantially more than the other neural architectures in the reference experiment. Its greater capacity and pretrained representation were associated with a much stronger fit to the training objective, but this did not translate into the strongest held-out result.
-
-The precision-recall pattern was also notable:
-
-```text
-Precision : 0.8416
-Recall    : 0.7291
-```
-
-The model was more precise when predicting the positive class than it was successful at recovering all positive reviews.
-
-As with the RNN and LSTM results, the exact BiLSTM performance should be interpreted as a **reference-experiment result**. The modular v1 recurrent implementation has since been corrected to use true sequence lengths and packed recurrent processing, and its FastText PAD embedding is explicitly kept at zero.
-
-The final full neural rerun will therefore determine whether the same training-fit and held-out-performance pattern remains under the corrected implementation.
-
-### Self-Attention: strongest neural result
-
-The Self-Attention model achieved:
-
-```text
-Accuracy : 0.8629
-Precision: 0.8782
-Recall   : 0.8427
+Accuracy : 0.8622
+Precision: 0.8735
+Recall   : 0.8470
 F1       : 0.8601
 ```
 
 Its training loss decreased consistently:
 
 ```text
-Epoch 1  : 0.5840
-Epoch 5  : 0.2888
-Epoch 10 : 0.2022
+Epoch 1  : 0.5891
+Epoch 10 : 0.0339
 ```
 
-It substantially outperformed the Vanilla RNN, LSTM, and BiLSTM + FastText on held-out F1.
-
-Unlike recurrent models, self-attention allows positions in the review to interact directly rather than requiring information to move sequentially through every intermediate timestep.
-
-The implemented architecture uses:
+Compared with the finalized Vanilla RNN:
 
 ```text
-Token embeddings
-      +
-Positional encoding
-      ↓
-LayerNorm + Dropout
-      ↓
-Learnable CLS token
-      ↓
-Multi-Head Self-Attention
-      ↓
-CLS representation
-      ↓
-Classification head
+Vanilla RNN F1 : 0.7779
+LSTM F1        : 0.8601
+Difference     : +0.0822
 ```
 
-The repository uses the term **Self-Attention** because the queries, keys, and values are derived from the same sequence.
+The LSTM therefore substantially outperformed the Vanilla RNN while using the same corrected variable-length sequence handling.
 
-The model also provides attention weights for later inspection, offering an additional diagnostic view of learned token relationships that is not available in the recurrent baselines. These weights are useful for inspecting attention patterns, but they should not be interpreted as complete explanations of the model's predictions.
+This comparison provides cleaner evidence for the practical advantage of gated recurrence in this experiment. The LSTM's memory cell and gating mechanisms provide additional control over what information is retained, updated, and forgotten while processing a sequence.
+
+At the same time, the corrected result shows why the earlier RNN-to-LSTM comparison had to be interpreted cautiously. The original observed F1 gap was approximately `0.3032`; after correcting recurrent sequence handling, the gap became `0.0822`.
+
+The LSTM still performed clearly better, but the magnitude of the architectural difference was substantially smaller once the implementation confound was removed.
+
+### BiLSTM + FastText: strongest training fit, but not strongest generalization
+
+The BiLSTM experiment combined:
+
+1. bidirectional recurrent processing
+2. pretrained 300-dimensional FastText embeddings
+
+FastText coverage for the finalized vocabulary was:
+
+```text
+Vocabulary size          : 29,123
+Words with FastText vector: 26,296
+Coverage                 : 90.3%
+```
+
+The finalized model achieved:
+
+```text
+Accuracy : 0.8476
+Precision: 0.8375
+Recall   : 0.8624
+F1       : 0.8498
+```
+
+Its training loss decreased dramatically:
+
+```text
+Epoch 1  : 0.5482
+Epoch 10 : 0.0147
+```
+
+This was the lowest final training loss among all four neural models.
+
+However, the BiLSTM + FastText model did not achieve the strongest held-out performance. Its F1 of `0.8498` remained below both the LSTM (`0.8601`) and Self-Attention (`0.8620`).
+
+The model also had the largest parameter count:
+
+```text
+11,588,229 trainable parameters
+```
+
+This provides a useful generalization lesson:
+
+> **Greater model capacity, pretrained embeddings, and lower training loss do not automatically produce better held-out performance.**
+
+The precision-recall pattern was also notable:
+
+```text
+Precision : 0.8375
+Recall    : 0.8624
+```
+
+Among the finalized neural models, BiLSTM + FastText achieved the highest recall, indicating that it recovered a relatively large proportion of positive reviews, although with lower precision than the LSTM and Self-Attention models.
+
+### Self-Attention: strongest neural result
+
+The finalized Self-Attention model achieved the strongest overall neural result:
+
+```text
+Accuracy : 0.8636
+Precision: 0.8722
+Recall   : 0.8519
+F1       : 0.8620
+```
+
+<p align="center">
+  <img src="images/experiment-results/self_attention_confusion_matrix.png"
+       alt="Confusion matrix for the finalized Self-Attention model"
+       width="620">
+</p>
+
+The confusion matrix shows relatively balanced performance across positive and negative reviews, consistent with the model's strong precision, recall, and F1 scores.
+
+Its training loss decreased steadily:
+
+```text
+Epoch 1  : 0.5834
+Epoch 10 : 0.2010
+```
+
+The model achieved the highest neural F1 despite finishing with a substantially higher training loss than both the LSTM and BiLSTM + FastText models.
+
+This again demonstrates that minimizing training loss as aggressively as possible is not equivalent to maximizing held-out performance.
+
+The Self-Attention result was only slightly ahead of the finalized LSTM:
+
+```text
+Self-Attention F1 : 0.8620
+LSTM F1           : 0.8601
+Difference        : 0.0019
+```
+
+The two models should therefore be viewed as performing very similarly under this experimental configuration rather than as demonstrating a large performance advantage for Self-Attention.
+
+The Self-Attention architecture also provides attention weights for later inspection, offering an additional diagnostic view of learned token relationships that is not available in the recurrent baselines. These weights are useful for inspecting attention patterns, but they should not be interpreted as complete explanations of the model's predictions.
+
+### Neural Model Takeaway
+
+The finalized experiment produces a more balanced picture than the earlier reference results.
+
+The corrected ranking is:
+
+```text
+Self-Attention      F1 = 0.8620
+LSTM                F1 = 0.8601
+BiLSTM + FastText   F1 = 0.8498
+Vanilla RNN         F1 = 0.7779
+```
+
+Three conclusions stand out:
+
+1. **Correct sequence handling matters.** Fixing padded-sequence handling materially improved all recurrent-model comparisons, with the largest effect observed for the Vanilla RNN.
+
+2. **Architectural complexity does not guarantee better generalization.** BiLSTM + FastText had the largest parameter count and lowest training loss but did not achieve the strongest test F1.
+
+3. **LSTM and Self-Attention performed very similarly.** Self-Attention achieved the highest neural F1, but its advantage over LSTM was only `0.0019`.
+
+The corrected experiment therefore provides a stronger basis for comparing the architectures because the recurrent models now operate on true sequence lengths rather than allowing padded timesteps to confound their final representations.
 
 ---
 
 ## 6. Training Loss and Generalization
 
-The reference neural experiment makes the distinction between **fitting the training data** and **generalizing to unseen data** especially visible.
+The finalized neural experiment makes the distinction between **fitting the training data** and **generalizing to unseen data** particularly clear.
 
 | Model | Final Training Loss | Test F1 |
 |---|---:|---:|
-| BiLSTM + FastText | **0.0390** | 0.7813 |
-| Self-Attention | 0.2022 | **0.8601** |
-| LSTM | 0.4207 | 0.7906 |
-| Vanilla RNN | 0.6976 | 0.4874 |
+| BiLSTM + FastText | **0.0147** | 0.8498 |
+| LSTM | 0.0339 | 0.8601 |
+| Self-Attention | 0.2010 | **0.8620** |
+| Vanilla RNN | 0.4436 | 0.7779 |
 
-If training loss alone were used to select the model in the reference experiment, BiLSTM + FastText would appear overwhelmingly superior.
+### Neural Training-Loss Comparison
 
-The held-out test result tells a different story.
+<p align="center">
+  <img src="images/experiment-results/neural_loss_comparison.png"
+       alt="Training-loss comparison for the finalized neural models"
+       width="900">
+</p>
 
-Self-Attention finished with a substantially higher training loss (`0.2022`) but achieved a much stronger test F1 (`0.8601`) than BiLSTM + FastText (`0.7813`).
+The combined loss curves make the contrast between training fit and held-out performance especially visible. BiLSTM + FastText and LSTM drove training loss far below Self-Attention, yet Self-Attention achieved the numerically highest neural test F1. The RNN curve also shows a less stable optimization path, including temporary loss increases in the middle epochs, before ending substantially below its initial loss.
+
+If final training loss alone were used to select a model, BiLSTM + FastText would appear to be the strongest model by a substantial margin.
+
+The held-out test results tell a different story.
+
+BiLSTM + FastText reached the lowest final training loss (`0.0147`) but achieved a test F1 of `0.8498`. In contrast, Self-Attention finished with a much higher training loss (`0.2010`) while achieving the strongest neural test F1 (`0.8620`).
+
+The LSTM showed the same general pattern:
+
+```text
+LSTM
+Final training loss : 0.0339
+Test F1             : 0.8601
+
+Self-Attention
+Final training loss : 0.2010
+Test F1             : 0.8620
+```
+
+Despite the LSTM fitting the training objective much more strongly, its held-out performance was essentially comparable to Self-Attention.
 
 This illustrates an important machine-learning principle:
 
@@ -466,85 +559,221 @@ Held-out metrics
 How well did the learned behavior transfer to unseen reviews?
 ```
 
-Under the reference configuration, the BiLSTM + FastText result is consistent with a **generalization gap**: the model fit the training objective extremely strongly, but this did not translate into correspondingly strong held-out performance.
+### Evidence of a Generalization Gap
 
-Because the experiment did not maintain a dedicated validation-loss curve for model selection, the exact onset and magnitude of overfitting cannot be established precisely from the available evidence.
+The BiLSTM + FastText model provides the clearest example.
 
-In addition, the modular v1 recurrent implementation has since been corrected to use true sequence lengths and packed recurrent processing. The RNN, LSTM, and BiLSTM + FastText results shown above should therefore be treated as **reference-experiment results** until the corrected full neural experiment is completed.
+Its training loss decreased from:
 
-The final full neural rerun will determine whether the same relationship between training loss and held-out performance remains under the corrected implementation.
+```text
+Epoch 1  : 0.5482
+Epoch 10 : 0.0147
+```
 
-The defensible conclusion from the reference experiment is therefore:
+Yet its test F1 (`0.8498`) remained below both:
 
-> **A substantially lower training loss did not correspond to better held-out performance, demonstrating why training loss alone is insufficient for model selection.**
+```text
+LSTM F1           : 0.8601
+Self-Attention F1 : 0.8620
+```
 
+The model also had the largest capacity of the neural architectures:
+
+```text
+BiLSTM + FastText : 11,588,229 trainable parameters
+```
+
+The combination of very low final training loss, high model capacity, and comparatively weaker held-out performance is consistent with a **generalization gap**.
+
+However, the experiment did not maintain a dedicated validation-loss curve or perform validation-based early stopping. Therefore, the exact onset or magnitude of overfitting cannot be established precisely from the available evidence.
+
+It is more defensible to conclude that the BiLSTM + FastText model fit the training objective much more strongly than was reflected in its held-out performance.
+
+### Why Test Metrics Matter
+
+The finalized results demonstrate why model selection should not be based on training loss alone.
+
+A model can continue improving its fit to the training data without producing a corresponding improvement on unseen examples.
+
+For this experiment, the relevant comparison is therefore not:
+
+```text
+Which model achieved the lowest training loss?
+```
+
+but rather:
+
+```text
+Which model produced the strongest held-out classification performance?
+```
+
+Under that criterion, Self-Attention achieved the strongest neural F1 (`0.8620`), with LSTM (`0.8601`) performing almost identically.
+
+### Main Takeaway
+
+The finalized neural experiment supports the following conclusion:
+
+> **A substantially lower training loss did not necessarily correspond to better held-out performance.**
+
+BiLSTM + FastText and LSTM both achieved much lower final training losses than Self-Attention, yet Self-Attention produced the highest neural test F1.
+
+This reinforces the importance of evaluating model behavior using held-out metrics rather than interpreting training loss as a direct measure of generalization.
 ---
 
 ## 7. Classical vs Neural Models
 
-Using the completed classical results together with the reference neural experiment gives the following comparison:
+With the finalized classical and neural experiments, all eight models can now be compared using the same held-out IMDb test split.
 
-| Model | Family | F1 Score |
-|---|---|---:|
-| **LinearSVC** | Classical | **0.8750** |
-| Logistic Regression | Classical | 0.8748 |
-| Self-Attention | Neural | 0.8601 |
-| Random Forest | Classical | 0.8544 |
-| Bernoulli Naive Bayes | Classical | 0.8117 |
-| LSTM | Neural | 0.7906 |
-| BiLSTM + FastText | Neural | 0.7813 |
-| Vanilla RNN | Neural | 0.4874 |
+| Model | Family | Accuracy | Precision | Recall | F1 Score |
+|---|---|---:|---:|---:|---:|
+| **LinearSVC** | Classical | **0.8750** | 0.8726 | 0.8783 | **0.8750** |
+| Logistic Regression | Classical | 0.8748 | 0.8708 | **0.8802** | 0.8748 |
+| Self-Attention | Neural | 0.8636 | 0.8722 | 0.8519 | 0.8620 |
+| LSTM | Neural | 0.8622 | **0.8735** | 0.8470 | 0.8601 |
+| Random Forest | Classical | 0.8544 | 0.8521 | 0.8575 | 0.8544 |
+| BiLSTM + FastText | Neural | 0.8476 | 0.8375 | 0.8624 | 0.8498 |
+| Bernoulli Naive Bayes | Classical | 0.8117 | 0.8082 | 0.8177 | 0.8117 |
+| Vanilla RNN | Neural | 0.7802 | 0.7861 | 0.7699 | 0.7779 |
 
-The classical results represent the completed modular experiment. The neural values shown here come from the completed reference notebook experiment and will be updated after the corrected modular v1 neural pipeline is run in full.
+### Classical Baselines Remained Highly Competitive
 
-### Complexity did not automatically win
-
-In the reference comparison, the strongest observed result came from LinearSVC, not from the largest or most sophisticated neural architecture.
-
-Logistic Regression was essentially tied with it.
-
-This is an important result because sparse bag-of-words-style representations can be highly effective for sentiment classification when discriminative words and phrases already carry strong predictive information.
-
-A neural model can learn richer sequence-dependent representations, but additional representational capacity is useful only when it translates into better generalization for the task and training configuration.
-
-### Self-Attention came closest
-
-Among the neural architectures in the reference experiment, Self-Attention came closest to the strongest classical baselines:
+The strongest overall result came from LinearSVC:
 
 ```text
 LinearSVC F1           : 0.8750
 Logistic Regression F1 : 0.8748
-Self-Attention F1      : 0.8601
 ```
 
-The observed gap between Self-Attention and LinearSVC was `0.0149`.
+The difference between the two models was only:
 
-Unlike the recurrent architectures, the Self-Attention implementation was not affected by the recurrent packed-sequence correction. Nevertheless, the complete neural comparison will be refreshed after the final modular v1 run so that all neural results originate from the same finalized execution workflow.
+```text
+0.0002 F1
+```
 
-### Practical model choice
+This demonstrates how effective sparse TF-IDF representations combined with linear classifiers can be for IMDb sentiment classification.
 
-Based on the evidence currently available, LinearSVC remains a strong practical candidate because it combines:
+Sentiment is often expressed through highly discriminative words and short phrases, making sparse lexical representations particularly effective for this task.
+
+### Neural Complexity Did Not Automatically Produce Better Performance
+
+The strongest neural result came from Self-Attention:
+
+```text
+Self-Attention F1 : 0.8620
+```
+
+followed very closely by:
+
+```text
+LSTM F1 : 0.8601
+```
+
+Neither exceeded the strongest linear classical baselines.
+
+The gap between the best classical and neural models was:
+
+```text
+LinearSVC F1      : 0.8750
+Self-Attention F1 : 0.8620
+Difference        : 0.0130
+```
+
+This is relatively small, but it reinforces an important engineering lesson:
+
+> **Greater architectural complexity does not automatically translate into better held-out performance.**
+
+The appropriate model depends on the task, representation, computational requirements, deployment constraints, and the magnitude of any measurable performance benefit.
+
+### Self-Attention and LSTM Were Essentially Comparable
+
+The two strongest neural models produced very similar results:
+
+```text
+Self-Attention F1 : 0.8620
+LSTM F1           : 0.8601
+Difference        : 0.0019
+```
+
+The experiment therefore does not support a claim that Self-Attention was substantially better than LSTM.
+
+Instead, both architectures learned strong sentiment classifiers under the finalized configuration, with Self-Attention achieving a small numerical advantage.
+
+### BiLSTM + FastText Did Not Benefit Enough From Its Additional Complexity
+
+BiLSTM + FastText had the largest neural parameter count:
+
+```text
+11,588,229 trainable parameters
+```
+
+and achieved the lowest final training loss:
+
+```text
+0.0147
+```
+
+However, its held-out F1 was:
+
+```text
+0.8498
+```
+
+which remained below both Self-Attention and LSTM.
+
+The pretrained FastText embeddings achieved `90.3%` vocabulary coverage, and bidirectional recurrence provided additional representational capacity, but these advantages did not translate into the strongest held-out performance.
+
+This is another example of why model capacity and training fit should not be treated as substitutes for test-set evaluation.
+
+### The Corrected RNN Result Changes the Architectural Comparison
+
+The finalized Vanilla RNN achieved:
+
+```text
+F1 : 0.7779
+```
+
+This remains the weakest neural result, but it is substantially stronger than the earlier near-chance result of `0.4874`.
+
+The improvement followed the correction of recurrent sequence handling so that true sequence lengths and packed recurrent processing were used instead of allowing padded timesteps to influence the final recurrent representation.
+
+This materially changes the interpretation of the experiment.
+
+The finalized results still show a clear advantage for LSTM over Vanilla RNN:
+
+```text
+Vanilla RNN F1 : 0.7779
+LSTM F1        : 0.8601
+Difference     : 0.0822
+```
+
+However, this is much smaller than the earlier observed difference and provides a cleaner comparison between basic and gated recurrence.
+
+### Practical Model Choice
+
+For a production-oriented implementation of this particular experiment, LinearSVC would remain a strong candidate because it combines:
 
 - the highest observed held-out F1
-- relatively low architectural complexity
-- efficient inference
-- straightforward deployment
+- relatively low model complexity
+- efficient training and inference
 - no GPU requirement for inference
-- simpler operational maintenance than the neural alternatives
+- straightforward deployment and operational maintenance
 
-This does **not** make the neural experiments unnecessary.
+Logistic Regression would also be an excellent candidate because its performance was effectively tied with LinearSVC while providing probabilistic outputs through `predict_proba`.
 
-The neural models expose different learning mechanisms and provide useful evidence about recurrent memory, pretrained embeddings, bidirectional context, attention, model capacity, and generalization.
+The neural experiments remain valuable for a different reason: they demonstrate and compare recurrent processing, gated memory, bidirectional context, pretrained embeddings, self-attention, sequence-length handling, and model generalization.
 
-The best engineering choice and the most educational model are not necessarily the same thing.
+The strongest engineering choice and the most educational architecture are therefore not necessarily the same model.
 
-### Final comparison pending corrected neural run
+### Main Takeaway
 
-The final ranking should not be treated as fixed until the corrected modular neural experiment has been completed.
+The finalized eight-model comparison demonstrates that:
 
-In particular, the updated RNN, LSTM, and BiLSTM + FastText results may change because the finalized recurrent implementation now uses true sequence lengths and packed recurrent processing.
+1. **Strong classical baselines matter.** LinearSVC and Logistic Regression remained the strongest overall models.
+2. **Neural models were competitive but not automatically superior.** Self-Attention and LSTM came close to the best classical results.
+3. **Additional complexity did not guarantee better generalization.** BiLSTM + FastText was the largest neural model and achieved the lowest training loss without achieving the highest test F1.
+4. **Implementation correctness materially affects architectural conclusions.** Correcting recurrent sequence handling changed the Vanilla RNN result from near-chance performance to a meaningful F1 of `0.7779`.
 
-After that run, this section will be updated with the final v1 neural metrics and the resulting classical-versus-neural comparison.
+The experiment therefore supports model selection based on measured held-out performance, computational cost, operational requirements, and implementation correctness rather than architectural complexity alone.
 
 ---
 
@@ -697,31 +926,102 @@ The completed experiments support several useful conclusions.
 
 ### Strong classical baselines matter
 
-LinearSVC and Logistic Regression achieved the two strongest held-out F1 scores.
+LinearSVC and Logistic Regression achieved the two strongest held-out F1 scores:
 
-A sophisticated neural architecture should therefore be compared against strong classical baselines rather than assumed to be superior because it is newer or more complex.
+```text
+LinearSVC F1           : 0.8750
+Logistic Regression F1 : 0.8748
+```
 
-### LSTM gating made a large practical difference
+A neural architecture should therefore be compared against strong classical baselines rather than assumed to be superior because it is newer or more complex.
 
-Under the implemented configuration, moving from Vanilla RNN to LSTM improved F1 from `0.4874` to `0.7906`.
+### Correct sequence handling materially affects recurrent-model results
 
-The training curves also changed from near-stagnation to sustained learning.
+One of the most important findings emerged from correcting the recurrent sequence-handling implementation.
+
+The earlier Vanilla RNN result was:
+
+```text
+Earlier RNN F1   : 0.4874
+```
+
+After using true sequence lengths and packed recurrent processing, the finalized result became:
+
+```text
+Finalized RNN F1 : 0.7779
+```
+
+This substantial change demonstrates that implementation details can materially affect experimental results and can lead to misleading architectural conclusions if they are not controlled correctly.
+
+### LSTM gating still provided a clear advantage
+
+With the corrected sequence handling applied consistently, the finalized comparison was:
+
+```text
+Vanilla RNN F1 : 0.7779
+LSTM F1        : 0.8601
+Difference     : +0.0822
+```
+
+The LSTM therefore still substantially outperformed the Vanilla RNN.
+
+This provides cleaner evidence that gated recurrence was beneficial under the implemented configuration, while also showing that the earlier performance gap had been exaggerated by the sequence-handling issue.
 
 ### Training fit and generalization are different
 
-BiLSTM + FastText achieved the lowest training loss by a large margin but did not produce the strongest test result.
+BiLSTM + FastText achieved the lowest final training loss:
 
-The experiment gives a concrete example of why training loss cannot be used as the sole model-selection criterion.
+```text
+0.0147
+```
+
+but did not produce the strongest held-out neural result.
+
+Its F1 was:
+
+```text
+0.8498
+```
+
+compared with:
+
+```text
+LSTM F1           : 0.8601
+Self-Attention F1 : 0.8620
+```
+
+The experiment therefore provides a concrete example of why training loss cannot be used as the sole model-selection criterion.
 
 ### More parameters did not guarantee better performance
 
-BiLSTM + FastText had the largest trainable parameter count, yet its held-out F1 was below the simpler LSTM and far below Self-Attention.
+BiLSTM + FastText had the largest trainable parameter count:
 
-Capacity is useful only when it is converted into generalizable behavior.
+```text
+11,588,229
+```
+
+yet its held-out F1 remained below both LSTM and Self-Attention.
+
+Greater model capacity and pretrained embeddings did not automatically translate into stronger generalization.
 
 ### Self-Attention was the strongest neural architecture
 
-Self-Attention reached `0.8601` F1 and was the only neural model to approach the strongest classical baselines.
+Self-Attention achieved the strongest finalized neural result:
+
+```text
+Accuracy : 0.8636
+F1       : 0.8620
+```
+
+However, LSTM was extremely close:
+
+```text
+LSTM F1           : 0.8601
+Self-Attention F1 : 0.8620
+Difference        : 0.0019
+```
+
+The results therefore support describing Self-Attention as the strongest neural model in this experiment, but not as substantially superior to LSTM.
 
 ### Model choice is an engineering decision
 
@@ -739,7 +1039,7 @@ Relevant considerations include:
 - operational complexity
 - maintainability
 
-For the evidence available in this project, LinearSVC offers a particularly strong balance.
+For the evidence available in this project, LinearSVC offers a particularly strong balance of predictive performance, simplicity, and operational efficiency.
 
 ---
 
@@ -753,7 +1053,7 @@ The neural experiments were designed to compare modeling approaches, not to find
 
 Therefore, the results should not be interpreted as:
 
-> "LSTM can only achieve 0.7906 F1 on IMDb."
+> "LSTM can only achieve 0.8601 F1 on IMDb."
 
 They show what the implemented LSTM configuration achieved in this experiment.
 
@@ -769,25 +1069,39 @@ The result therefore cannot tell us whether the observed behavior came primarily
 - the larger parameter count
 - interactions with the training configuration
 
-A controlled ablation is needed.
+A controlled ablation would be needed to separate these effects.
 
 ### The neural test set is not a validation set
 
 The neural workflow does not include a dedicated validation split for decisions such as epoch selection, learning-rate tuning, regularization, or early stopping.
 
-A more rigorous model-development workflow would reserve validation data for those decisions and use the test set only once for final evaluation.
+A more rigorous model-development workflow would reserve validation data for those decisions and use the test set only for final evaluation.
 
-### One run does not measure neural variance
+### The completed runs do not measure neural variance across random seeds
 
-Neural training is stochastic.
+The finalized neural experiment was executed twice on a Tesla T4 using the same implementation and configuration, and both executions reproduced the same evaluation metrics and epoch-level training losses.
 
-The reference scores describe completed runs, not a distribution across random seeds.
+This provides useful evidence of reproducibility under the tested environment and configuration.
 
-Repeated experiments would be needed to estimate mean performance and variance.
+However, the runs did not constitute a controlled multi-seed experiment. Neural-model performance can vary with initialization, data ordering, hardware behavior, and other stochastic factors.
+
+Repeated experiments across multiple random seeds would therefore be needed to estimate mean performance, variance, and the statistical stability of the small differences between models.
+
+This is particularly relevant to the small observed difference between:
+
+```text
+Self-Attention F1 : 0.8620
+LSTM F1           : 0.8601
+Difference        : 0.0019
+```
+
+The current experiment does not establish that this small difference represents a statistically reliable advantage for Self-Attention.
 
 ### Attention weights are not causal explanations
 
-The attention visualization provides insight into model behavior but does not establish that highly weighted tokens alone caused a prediction.
+The attention visualization provides useful diagnostic information about which token relationships received stronger attention within the model.
+
+However, attention weights alone do not establish why a particular prediction was made and should not be interpreted as a complete causal explanation of model behavior.
 
 ### The comparison does not prove a universal ranking
 
@@ -824,7 +1138,7 @@ This would allow the effect of bidirectionality and pretrained embeddings to be 
 
 Track training and validation loss together and stop when validation performance no longer improves.
 
-This would be especially useful for investigating the BiLSTM generalization gap.
+This would be especially useful for investigating the generalization behavior of BiLSTM + FastText and LSTM, both of which reached very low training losses without outperforming Self-Attention on the held-out test set.
 
 ### Tune neural regularization
 
@@ -850,13 +1164,15 @@ Testing shorter and longer limits could reveal the trade-off between:
 
 ### Repeat neural runs across random seeds
 
-Rather than comparing one score per model, repeated runs could report:
+The finalized neural experiment was reproduced twice under the same configuration, producing identical evaluation metrics and epoch-level training losses.
+
+A stronger follow-up experiment would vary the random seed systematically and report results such as:
 
 ```text
 mean F1 ± standard deviation
 ```
 
-This would make the neural comparison statistically more informative.
+This would quantify performance variance and help determine whether small observed differences, such as the `0.0019` F1 gap between Self-Attention and LSTM, are statistically meaningful.
 
 ### Add stronger representation baselines
 
@@ -870,10 +1186,10 @@ These are follow-up experiments, not missing requirements for the current reposi
 
 ## 13. Key Learnings
 
-The most useful outcome of the project is not one winning score. It is the set of modeling lessons exposed by the comparison.
+The most useful outcome of the project is not one winning score. It is the set of modeling and engineering lessons exposed by the comparison.
 
 1. **Always establish strong simple baselines.**  
-   LinearSVC and Logistic Regression remained stronger than all neural models in the completed comparison.
+   LinearSVC and Logistic Regression remained stronger than all neural models in the finalized comparison.
 
 2. **Accuracy alone is not enough.**  
    Precision, recall, F1, confusion matrices, and class-specific error behavior reveal different aspects of a classifier.
@@ -881,26 +1197,26 @@ The most useful outcome of the project is not one winning score. It is the set o
 3. **Cross-validation and held-out testing serve different purposes.**  
    Model selection should happen before final test evaluation.
 
-4. **Vanilla recurrence can struggle on long sequences.**  
-   The RNN's near-flat loss and chance-level performance made this limitation visible in practice.
+4. **Implementation correctness can change the scientific conclusion.**  
+   Correcting recurrent sequence handling changed Vanilla RNN F1 from `0.4874` to `0.7779` and materially improved the LSTM and BiLSTM results as well.
 
-5. **Gating can materially improve recurrent learning.**  
-   The LSTM showed a large improvement over the basic RNN under the same task.
+5. **Gating still improved recurrent learning after the implementation confound was removed.**  
+   Under the finalized implementation, LSTM achieved `0.8601` F1 compared with `0.7779` for the Vanilla RNN.
 
 6. **Lower training loss is not the same as better generalization.**  
-   BiLSTM + FastText provided the clearest example.
+   BiLSTM + FastText achieved the lowest final training loss (`0.0147`) without achieving the strongest held-out F1.
 
 7. **More parameters do not guarantee better results.**  
    The largest neural model was not the strongest held-out classifier.
 
-8. **Attention can improve contextual modeling without solving every semantic problem.**  
-   Self-Attention was the strongest neural model, yet mixed-sentiment reviews remained challenging.
+8. **Self-Attention and LSTM performed very similarly.**  
+   Self-Attention was numerically strongest at `0.8620` F1, but the difference from LSTM (`0.8601`) was only `0.0019` and was not tested across multiple random seeds.
 
 9. **Interpretability tools should be used carefully.**  
    Attention weights can help inspect model behavior but are not complete causal explanations.
 
 10. **Model selection is ultimately an engineering trade-off.**  
-    Predictive performance has to be considered together with compute, inference requirements, complexity, and maintainability.
+    Predictive performance has to be considered together with compute, inference requirements, complexity, reproducibility, and maintainability.
 
 ---
 
@@ -918,14 +1234,16 @@ toward:
 
 For this experiment, the answer is nuanced:
 
-- **LinearSVC** produced the strongest observed held-out F1.
-- **Logistic Regression** was essentially tied while remaining very efficient.
-- **Self-Attention** was the strongest neural model.
-- **LSTM** demonstrated the practical value of gated recurrence over a basic RNN.
-- **BiLSTM + FastText** demonstrated that an extremely low training loss can coexist with weaker held-out generalization.
-- **Vanilla RNN** provided a useful failure case showing that architectural simplicity is not always sufficient for long-sequence learning.
+- **LinearSVC** produced the strongest observed held-out F1 (`0.8750`).
+- **Logistic Regression** was essentially tied (`0.8748`) while remaining very efficient.
+- **Self-Attention** produced the numerically strongest neural F1 (`0.8620`), with **LSTM** almost identical at `0.8601`.
+- **LSTM** demonstrated a clear advantage over the corrected Vanilla RNN while showing that the earlier RNN-to-LSTM gap had been exaggerated by improper sequence handling.
+- **BiLSTM + FastText** demonstrated that extremely low training loss and greater model capacity can coexist with weaker held-out generalization.
+- **Vanilla RNN** became one of the most valuable debugging lessons in the project: correcting padded-sequence handling changed its F1 from `0.4874` to `0.7779`, showing how an implementation detail can materially distort architectural conclusions.
 
-Together, those outcomes provide a more useful learning record than a single winning metric.
+The finalized neural experiment was also reproduced twice under the same configuration on a Tesla T4, producing identical evaluation metrics and epoch-level losses. This does not replace a formal multi-seed variance study, but it provides useful evidence that the finalized workflow is reproducible under the tested environment.
+
+Together, these outcomes provide a more useful learning record than a single winning metric. The project documents not only model results, but also the process of identifying an experimental confound, correcting the implementation, rerunning the workflow, and revising the interpretation based on evidence.
 
 ---
 
