@@ -60,10 +60,10 @@ Rather than treating the notebook as the final software structure, the reusable 
 - artifact generation and reporting
 - experiment orchestration
 
-The repository therefore keeps two complementary views of the work:
+The project evolved through two complementary stages:
 
-**The notebook captures the experimentation and learning process.  
-The modular codebase captures the reusable engineering implementation.**
+**The original notebook captured the experimentation and learning process.  
+The current repository captures the reusable engineering implementation.**
 
 The goal is not only to compare model scores, but also to build an experiment that can be rerun, validated, inspected, and extended without depending on a single notebook execution.
 
@@ -121,11 +121,11 @@ These are intentionally separated from v1 so that the current repository can fir
 
 ### Tested Environment
 
-This v1.0 release has been tested with:
+This v1 release has been validated with:
 
-- **Python:** 3.13.14
-- **Operating system:** Windows
-- **Execution:** CPU; CUDA is automatically used when available for neural experiments
+- **Local environment:** Python 3.13.14 on Windows
+- **Local execution:** CPU
+- **Full neural validation:** CUDA on an NVIDIA Tesla T4
 - **Dependencies:** pinned in `requirements.txt`
 
 > **Compatibility note:** Python 3.14 is currently not recommended for this release because the FastText/Gensim dependency path previously encountered compatibility issues with that version.
@@ -270,7 +270,9 @@ Raw IMDb Review
 Vocabulary Lookup
        │
        ▼
-Fixed-Length Token Sequence
+Padded / Truncated Token Sequence
+       +
+ True Sequence Length
        │
        ▼
 PyTorch Dataset / DataLoader
@@ -279,7 +281,7 @@ PyTorch Dataset / DataLoader
    Neural Model
 ```
 
-For the neural models, reviews are tokenized and converted into integer token sequences using a vocabulary built from the training data. The sequences are then padded or truncated to a fixed length before being passed to PyTorch `Dataset` and `DataLoader` components.
+For the neural models, reviews are tokenized and converted into integer token sequences using a vocabulary built from the training data. The sequences are padded or truncated to the configured maximum length while their true sequence lengths are retained. The recurrent models use those lengths for packed sequence processing so that right-padding does not influence the final recurrent representation.
 
 The current neural pipeline uses:
 
@@ -296,15 +298,25 @@ The repository keeps the classical and neural experiment paths separate where th
 
 ```mermaid
 flowchart TD
-    A["run_experiment.py<br/>Master Runner"] --> B["run_classical.py"]
-    A --> C["run_neural.py"]
-    B --> D["Classical ML Workflow"]
-    C --> E["Neural Workflow"]
-    D --> F["Evaluation"]
+    A["run_experiment.py - Master Runner"]
+    B["run_classical.py"]
+    C["run_neural.py"]
+    D["Classical ML Workflow"]
+    E["Neural Workflow"]
+    F["Evaluation"]
+    G["Validation"]
+    H["Reporting"]
+    I["Figures / Metrics / Reports"]
+
+    A --> B
+    A --> C
+    B --> D
+    C --> E
+    D --> F
     E --> F
-    F --> G["Validation"]
-    F --> H["Reporting"]
-    H --> I["Figures / Metrics / Reports"]
+    F --> G
+    F --> H
+    H --> I
 ```
 
 For the deeper module boundaries, runner design, full-vs-smoke execution, artifact architecture, and engineering decisions, see **[Architecture Documentation](docs/architecture/README.md)**.
@@ -556,6 +568,7 @@ imdb-sentiment-classification/
 │   └── experiment_analysis.md
 │
 ├── requirements.txt
+├── LICENSE
 ├── .gitignore
 └── README.md
 ```
@@ -1315,9 +1328,9 @@ These libraries provide the modeling, data-processing, evaluation, and visualiza
 
 ## License
 
-This project is intended for educational and portfolio purposes.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-A formal open-source license has not yet been added to the repository.
+---
 
 ## Project Status
 
@@ -1346,7 +1359,3 @@ Documented Results and Analysis
 The core experiment pipeline is implemented and validated.
 
 Potential later versions may extend the project toward inference, containerization, CI/CD, cloud deployment, experiment tracking, and lightweight MLOps while keeping the existing experimentation layer intact.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
