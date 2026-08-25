@@ -626,13 +626,13 @@ With the finalized classical and neural experiments, all eight models can now be
 
 | Model | Family | Accuracy | Precision | Recall | F1 Score |
 |---|---|---:|---:|---:|---:|
-| **LinearSVC** | Classical | **0.8750** | 0.8726 | 0.8783 | **0.8750** |
-| Logistic Regression | Classical | 0.8748 | 0.8708 | **0.8802** | 0.8748 |
+| **LinearSVC** | Classical | **0.8746** | 0.8719 | 0.8782 | **0.8750** |
+| Logistic Regression | Classical | 0.8734 | 0.8658 | **0.8839** | 0.8748 |
 | Self-Attention | Neural | 0.8636 | 0.8722 | 0.8519 | 0.8620 |
 | LSTM | Neural | 0.8622 | **0.8735** | 0.8470 | 0.8601 |
-| Random Forest | Classical | 0.8544 | 0.8521 | 0.8575 | 0.8544 |
+| Random Forest | Classical | 0.8530 | 0.8463 | 0.8627 | 0.8544 |
 | BiLSTM + FastText | Neural | 0.8476 | 0.8375 | 0.8624 | 0.8498 |
-| Bernoulli Naive Bayes | Classical | 0.8117 | 0.8082 | 0.8177 | 0.8117 |
+| Bernoulli Naive Bayes | Classical | 0.8232 | 0.8683 | 0.7619 | 0.8117 |
 | Vanilla RNN | Neural | 0.7802 | 0.7861 | 0.7699 | 0.7779 |
 
 ### Classical Baselines Remained Highly Competitive
@@ -650,7 +650,7 @@ The difference between the two models was only:
 0.0002 F1
 ```
 
-This demonstrates how effective sparse TF-IDF representations combined with linear classifiers can be for IMDb sentiment classification.
+This demonstrates how effective sparse binary bag-of-words representations produced by CountVectorizer, combined with linear classifiers, can be for IMDb sentiment classification.
 
 Sentiment is often expressed through highly discriminative words and short phrases, making sparse lexical representations particularly effective for this task.
 

@@ -548,7 +548,7 @@ imdb-sentiment-classification/
 │   ├── architecture/
 │   │   └── README.md
 │   ├── images/
-│   │   ├── experiment-architecture.svg
+│   │   ├── experiment-architecture.png
 │   │   └── experiment-results/
 │   │       ├── neural_loss_comparison.png
 │   │       ├── rnn_confusion_matrix.png
@@ -1346,3 +1346,7 @@ Documented Results and Analysis
 The core experiment pipeline is implemented and validated.
 
 Potential later versions may extend the project toward inference, containerization, CI/CD, cloud deployment, experiment tracking, and lightweight MLOps while keeping the existing experimentation layer intact.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
