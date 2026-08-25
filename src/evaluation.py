@@ -49,9 +49,9 @@ def evaluate_model(
 
     # Calculate evaluation metrics
     accuracy = accuracy_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
 
     # Print metrics
     print(f"\n{'-' * 60}")
@@ -68,7 +68,8 @@ def evaluate_model(
     print(
         classification_report(
             y_true,
-            y_pred
+            y_pred,
+            zero_division=0,
         )
     )
 
@@ -167,9 +168,9 @@ def evaluate_neural(
     labels = np.array(all_labels)
 
     accuracy = accuracy_score(labels, preds)
-    f1 = f1_score(labels, preds)
-    precision = precision_score(labels, preds)
-    recall = recall_score(labels, preds)
+    f1 = f1_score(labels, preds, zero_division=0)
+    precision = precision_score(labels, preds, zero_division=0)
+    recall = recall_score(labels, preds, zero_division=0)
 
     print(f"\n=== {name} ===")
     print(f"Accuracy  : {accuracy:.4f}")

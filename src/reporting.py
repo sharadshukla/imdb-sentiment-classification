@@ -56,7 +56,8 @@ def save_comparison_csv(
 def save_comparison_json(
     results,
     output_path,
-    total_runtime_minutes=None
+    total_runtime_minutes=None,
+    metadata=None
 ):
     """
     Save experiment results as JSON.
@@ -112,6 +113,9 @@ def save_comparison_json(
         ),
         "models": models
     }
+
+    if metadata is not None:
+        report_data["metadata"] = metadata
 
     if total_runtime_minutes is not None:
         report_data["total_runtime_minutes"] = round(
@@ -265,7 +269,8 @@ def save_neural_comparison_json(
     results,
     output_path,
     total_runtime_minutes=None,
-    fasttext_preparation_minutes=None
+    fasttext_preparation_minutes=None,
+    metadata=None
 ):
     """
     Save neural experiment results as JSON.
@@ -303,6 +308,9 @@ def save_neural_comparison_json(
         "experiment": "IMDb Sentiment Classification - Neural Models",
         "models": models
     }
+
+    if metadata is not None:
+        report_data["metadata"] = metadata
 
     if fasttext_preparation_minutes is not None:
         report_data["fasttext_preparation_minutes"] = round(

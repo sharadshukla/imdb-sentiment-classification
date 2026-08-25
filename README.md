@@ -119,6 +119,17 @@ These are intentionally separated from v1 so that the current repository can fir
 
 ## Quick Start
 
+### Tested Environment
+
+This v1.0 release has been tested with:
+
+- **Python:** 3.13.14
+- **Operating system:** Windows
+- **Execution:** CPU; CUDA is automatically used when available for neural experiments
+- **Dependencies:** pinned in `requirements.txt`
+
+> **Compatibility note:** Python 3.14 is currently not recommended for this release because the FastText/Gensim dependency path previously encountered compatibility issues with that version.
+
 Clone the repository:
 
 ```bash
@@ -207,7 +218,7 @@ results/
 
 ## Dataset
 
-This project uses the **Stanford IMDb Large Movie Review Dataset**, a balanced benchmark dataset for binary sentiment classification.
+This project uses the **[Stanford IMDb Large Movie Review Dataset](https://ai.stanford.edu/~amaas/data/sentiment/)**, a balanced benchmark dataset for binary sentiment classification introduced by Maas et al.
 
 The labelled portion used in this project contains:
 
@@ -218,7 +229,7 @@ The labelled portion used in this project contains:
 
 Each review is labelled as either **positive (`1`)** or **negative (`0`)**.
 
-The dataset is loaded programmatically through the Hugging Face `datasets` library:
+The dataset is loaded programmatically through the Hugging Face `datasets` library using the [`stanfordnlp/imdb`](https://huggingface.co/datasets/stanfordnlp/imdb) dataset:
 
 ```python
 dataset = load_dataset("stanfordnlp/imdb")
@@ -537,7 +548,11 @@ imdb-sentiment-classification/
 │   ├── architecture/
 │   │   └── README.md
 │   ├── images/
-│   │   └── experiment-architecture.svg
+│   │   ├── experiment-architecture.png
+│   │   └── experiment-results/
+│   │       ├── neural_loss_comparison.png
+│   │       ├── rnn_confusion_matrix.png
+│   │       └── self_attention_confusion_matrix.png
 │   └── experiment_analysis.md
 │
 ├── requirements.txt
@@ -645,7 +660,7 @@ All four neural architectures are exercised:
 The current smoke-test result is:
 
 ```text
-Result: 31/31 checks passed
+Result: 35/35 checks passed
 
 SMOKE TEST: PASSED
 ```
@@ -668,6 +683,9 @@ The checks cover:
 - training-loss CSV generation
 - combined loss-comparison figure
 - experiment report generation
+- valid training and test sequence lengths
+- presence of variable-length sequences
+- zero-valued PAD embedding for the BiLSTM embedding matrix
 
 ---
 
@@ -727,9 +745,7 @@ It also makes the purpose of an artifact clear when inspecting the repository la
 
 The experiments compare predictive performance across classical machine-learning and neural-network approaches while also highlighting differences in training behavior, model complexity, and computational cost.
 
-The classical results below come from the full modularized experiment run. The neural results are taken from the completed original notebook experiment on which the modular implementation is based.
-
-Because neural-network training can vary slightly between runs, these values should be treated as representative experiment results rather than guarantees of bit-for-bit reproducibility.
+The classical results below come from the full modularized classical experiment. The neural results come from the finalized full modularized neural experiment, executed on the complete IMDb training and test splits using a Tesla T4 GPU.
 
 ### Classical Model Comparison
 
@@ -767,145 +783,114 @@ This is useful because the comparison is based not only on the final test result
 
 ---
 
-### Neural Model Comparison
+### Finalized Neural Model Comparison
 
-The completed notebook experiment trained each neural architecture for `10` epochs on the full training workflow.
+The finalized full neural experiment trained each architecture for `10` epochs on all `25,000` training reviews and evaluated it on all `25,000` held-out test reviews.
 
-| Model | Accuracy | Precision | Recall | F1 Score | Trainable Parameters | Final Training Loss |
-|---|---:|---:|---:|---:|---:|---:|
-| **Self-Attention** | **0.8629** | **0.8782** | **0.8427** | **0.8601** | 3,802,753 | 0.2022 |
-| **LSTM** | 0.7903 | 0.7897 | 0.7914 | 0.7906 | 4,649,601 | 0.4207 |
-| **BiLSTM + FastText** | 0.7959 | 0.8416 | 0.7291 | 0.7813 | 11,588,229 | **0.0390** |
-| **Vanilla RNN** | 0.4968 | 0.4967 | 0.4785 | 0.4874 | 3,958,401 | 0.6976 |
+| Model | Accuracy | Precision | Recall | F1 Score | Trainable Parameters | Final Training Loss | Runtime |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Self-Attention** | **0.8636** | 0.8722 | 0.8519 | **0.8620** | 3,802,753 | 0.2010 | 2.79 min |
+| **LSTM** | 0.8622 | **0.8735** | 0.8470 | 0.8601 | 4,649,601 | 0.0339 | 3.48 min |
+| **BiLSTM + FastText** | 0.8476 | 0.8375 | **0.8624** | 0.8498 | 11,588,229 | **0.0147** | 7.93 min |
+| **Vanilla RNN** | 0.7802 | 0.7861 | 0.7699 | 0.7779 | 3,958,401 | 0.4436 | **2.46 min** |
 
-The progression across these architectures reveals more than the final ranking alone.
+FastText preparation required approximately `6.86` minutes, and the complete neural experiment finished in approximately **24.56 minutes** on the Tesla T4.
 
----
-
-### Vanilla RNN Struggled with Long Review Sequences
-
-The Vanilla RNN remained close to random binary-classification performance:
-
-```text
-Accuracy : 0.4968
-F1       : 0.4874
-```
-
-Its training loss changed only slightly across ten epochs:
-
-```text
-Epoch 1  : 0.7007
-Epoch 10 : 0.6976
-```
-
-The loss effectively plateaued rather than showing sustained convergence.
-
-This behavior is consistent with one of the main limitations of vanilla recurrent networks on long sequences: information and gradients must propagate through many sequential steps.
-
-IMDb reviews are relatively long, and the neural pipeline processes sequences of up to `400` tokens. This makes the task particularly challenging for a basic RNN that has no gated long-term memory mechanism.
+The corrected full experiment was also executed twice under the same configuration and reproduced the same evaluation metrics and epoch-level training losses. This is useful reproducibility evidence for the tested configuration, although it is not a substitute for a controlled multi-seed variance study.
 
 ---
 
-### LSTM Produced a Large Improvement over the Vanilla RNN
+### Correct Sequence Handling Materially Changed the Recurrent Results
 
-Replacing the vanilla recurrent unit with an LSTM changed the result substantially:
+During the repository review, recurrent sequence handling was corrected so that the RNN-based models use the true sequence lengths and packed recurrent processing rather than allowing padded timesteps to influence the final recurrent representation.
 
-```text
-Vanilla RNN F1 : 0.4874
-LSTM F1        : 0.7906
+The correction materially changed the recurrent-model results:
 
-Improvement    : +0.3032
-```
+| Model | Earlier F1 | Finalized F1 |
+|---|---:|---:|
+| Vanilla RNN | 0.4874 | **0.7779** |
+| LSTM | 0.7906 | **0.8601** |
+| BiLSTM + FastText | 0.7813 | **0.8498** |
+| Self-Attention | 0.8601 | **0.8620** |
 
-The training-loss behavior changed as well:
-
-```text
-LSTM Epoch 1  : 0.6934
-LSTM Epoch 10 : 0.4207
-```
-
-Unlike the RNN, the LSTM continued learning through the later epochs.
-
-The result provides a practical demonstration of why gated recurrent architectures are better suited to long text sequences: the cell state and gating mechanisms provide a more effective path for retaining useful information over many timesteps.
+The Vanilla RNN therefore remains the weakest neural architecture, but it is no longer a near-random classifier. This correction is an important experimental lesson: implementation details can materially affect measured model behavior and the conclusions drawn from an architectural comparison.
 
 ---
 
-### BiLSTM + FastText Learned the Training Data Extremely Well — but Did Not Generalize Better
+### LSTM Still Clearly Outperformed the Vanilla RNN
 
-The BiLSTM introduced bidirectional recurrence together with pretrained `300`-dimensional FastText embeddings.
-
-Its training loss decreased dramatically:
+With sequence handling corrected consistently, the comparison became:
 
 ```text
-Epoch 1  : 0.5639
-Epoch 5  : 0.1310
-Epoch 10 : 0.0390
+Vanilla RNN F1 : 0.7779
+LSTM F1        : 0.8601
+Improvement    : +0.0822
 ```
 
-Yet its held-out performance was:
+The LSTM therefore retained a clear advantage over the Vanilla RNN, but the finalized comparison is considerably more credible than the earlier result because padded timesteps no longer confound the recurrent representation.
+
+---
+
+### BiLSTM + FastText Fit the Training Objective Most Strongly — but Did Not Generalize Best
+
+The BiLSTM + FastText model achieved the lowest final training loss:
 
 ```text
-Accuracy  : 0.7959
-F1        : 0.7813
-Precision : 0.8416
-Recall    : 0.7291
+Final training loss : 0.0147
+Test F1             : 0.8498
 ```
 
-Despite achieving by far the lowest final training loss, the model did **not** outperform the simpler LSTM on test F1.
+It also had the largest capacity at approximately **11.6 million trainable parameters** and achieved `90.3%` FastText vocabulary coverage.
 
-This is one of the most useful observations in the experiment:
+However, its held-out F1 remained below both LSTM (`0.8601`) and Self-Attention (`0.8620`).
 
-> **Lower training loss does not necessarily mean better generalization.**
+This provides a concrete example of why training loss alone should not determine model selection. The combination of very low training loss, high capacity, and comparatively weaker held-out performance is consistent with a generalization gap, although the current workflow does not include a dedicated validation-loss curve that would establish the precise onset or magnitude of overfitting.
 
-The BiLSTM + FastText model had approximately **11.6 million trainable parameters**, substantially more than the other neural architectures. Its strong fit to the training data did not translate into a corresponding improvement on unseen reviews.
-
-The experiment introduced bidirectionality and pretrained FastText embeddings together, so their individual contributions cannot be isolated from this result alone. A controlled ablation experiment would be required to measure them separately.
+Because bidirectionality and pretrained FastText embeddings were introduced together, their individual contributions cannot be isolated from this experiment alone. A controlled ablation would be required.
 
 ---
 
 ### Self-Attention Was the Strongest Neural Model
 
-The Self-Attention model achieved:
+Self-Attention achieved the strongest finalized neural F1:
 
 ```text
-Accuracy  : 0.8629
-Precision : 0.8782
-Recall    : 0.8427
-F1        : 0.8601
+Accuracy  : 0.8636
+Precision : 0.8722
+Recall    : 0.8519
+F1        : 0.8620
 ```
 
-Its training loss decreased consistently:
+LSTM was extremely close:
 
 ```text
-Epoch 1  : 0.5840
-Epoch 5  : 0.2888
-Epoch 10 : 0.2022
+LSTM F1           : 0.8601
+Self-Attention F1 : 0.8620
+Difference        : 0.0019
 ```
 
-The model substantially outperformed the Vanilla RNN, LSTM, and BiLSTM + FastText experiments.
+The experiment therefore supports describing Self-Attention as the strongest neural model in this run, but not as substantially superior to LSTM. Establishing whether such a small difference is statistically reliable would require repeated experiments across multiple random seeds.
 
-Unlike the recurrent models, Self-Attention allows different positions in the review to interact directly rather than requiring information to pass sequentially through every preceding timestep.
+The attention analysis also inspected attention-weight patterns for selected examples. In some correctly classified reviews, stronger attention appeared around evaluative or sentiment-bearing relationships; in some misclassified reviews, locally strong expressions did not align with the overall review sentiment.
 
-The experiment also visualized attention weights. Correct classifications often showed attention around useful evaluative or sentiment-bearing terms, while some misclassified reviews showed the model focusing on locally positive or negative words that did not fully represent the overall sentiment of the review.
+These patterns are treated as **diagnostic evidence rather than causal explanations**. Attention weights alone do not establish why a prediction was made; the prediction emerges from the complete learned representation, including token embeddings, positional information, attention-transformed representations, the aggregated `CLS` representation, normalization, and downstream classification layers.
 
 ---
 
 ### Training Loss vs Generalization
 
-Comparing the neural models makes an important distinction visible:
+The finalized neural results make the distinction between training fit and held-out performance particularly visible:
 
 | Model | Final Training Loss | Test F1 |
 |---|---:|---:|
-| BiLSTM + FastText | **0.0390** | 0.7813 |
-| Self-Attention | 0.2022 | **0.8601** |
-| LSTM | 0.4207 | 0.7906 |
-| Vanilla RNN | 0.6976 | 0.4874 |
+| BiLSTM + FastText | **0.0147** | 0.8498 |
+| LSTM | 0.0339 | 0.8601 |
+| Self-Attention | 0.2010 | **0.8620** |
+| Vanilla RNN | 0.4436 | 0.7779 |
 
-The BiLSTM achieved the lowest training loss by a large margin but did not achieve the highest test F1.
+BiLSTM + FastText and LSTM both drove the training objective substantially lower than Self-Attention, yet Self-Attention achieved the strongest neural held-out F1.
 
-Self-Attention finished with a higher training loss while generalizing considerably better to the held-out test set.
-
-This is why training loss and held-out performance need to be interpreted together rather than assuming that the model fitting the training data most strongly is automatically the better classifier.
+Training loss and held-out metrics therefore need to be interpreted together rather than assuming that the model fitting the training data most strongly is automatically the better classifier.
 
 ---
 
@@ -917,18 +902,16 @@ The strongest result across the complete comparison remained the classical Linea
 |---|---|---:|
 | **LinearSVC** | Classical | **0.8750** |
 | Logistic Regression | Classical | 0.8748 |
-| Self-Attention | Neural | 0.8601 |
+| Self-Attention | Neural | 0.8620 |
+| LSTM | Neural | 0.8601 |
 | Random Forest | Classical | 0.8544 |
+| BiLSTM + FastText | Neural | 0.8498 |
 | Bernoulli Naive Bayes | Classical | 0.8117 |
-| LSTM | Neural | 0.7906 |
-| BiLSTM + FastText | Neural | 0.7813 |
-| Vanilla RNN | Neural | 0.4874 |
-
-This result is particularly useful because it challenges the assumption that a more sophisticated architecture must outperform a simpler model.
+| Vanilla RNN | Neural | 0.7779 |
 
 For this IMDb experiment, **LinearSVC achieved the highest F1 score while remaining substantially simpler than the neural alternatives.**
 
-Self-Attention came closest among the neural models, reaching `0.8601` F1, but did not exceed the two strongest linear classifiers.
+Self-Attention and LSTM came close to the strongest classical baselines, but neither exceeded LinearSVC or Logistic Regression.
 
 For a practical deployment decision based on these experiments alone, LinearSVC would therefore be a strong candidate because it combines:
 
@@ -937,7 +920,7 @@ For a practical deployment decision based on these experiments alone, LinearSVC 
 - efficient inference
 - comparatively straightforward deployment and maintenance
 
-The neural experiments remain valuable because they expose behaviors that the classical models cannot demonstrate as directly: sequential memory, pretrained representation learning, bidirectional context, attention, and the relationship between training convergence and generalization.
+The neural experiments remain valuable because they expose behaviors that the classical models cannot demonstrate as directly: recurrent sequence modeling, gated memory, pretrained representation learning, bidirectional context, self-attention, and the relationship between training fit and generalization.
 
 ---
 
@@ -961,28 +944,28 @@ Conversely, some positive reviews discussed difficult or negative themes using w
 
 This exposes a fundamental limitation of presence-based text representations: a model can learn that certain words correlate strongly with positive or negative sentiment without fully understanding how those words contribute to the overall meaning of a long review.
 
-The attention experiment showed a related challenge. Attention can identify relationships and emphasize important parts of the sequence, but focusing on individually meaningful words does not guarantee that the complete sentiment of a complex review has been understood.
+The attention experiment showed a related challenge. Attention can model relationships and emphasize important parts of the sequence, but focusing strongly on particular token relationships does not guarantee that the complete sentiment of a complex review has been captured.
 
 ---
 
 ### Main Takeaway
 
-The experiment does not produce a simple conclusion that one modeling family is universally better.
+The finalized experiments demonstrate several complementary lessons:
 
-Instead, it demonstrates several complementary lessons:
-
-- simple linear classifiers can be extremely strong baselines for sparse text classification
-- LSTM gating can dramatically improve learning over a vanilla RNN on long sequences
+- strong classical baselines remain essential for text classification
+- correct sequence handling materially affects recurrent-model conclusions
+- LSTM gating still provides a clear advantage over the Vanilla RNN under the corrected implementation
 - lower training loss does not guarantee stronger held-out performance
 - pretrained embeddings and greater model capacity do not automatically improve generalization
-- Self-Attention provides the strongest neural result in this experiment
+- Self-Attention provides the strongest neural result, although LSTM is very close
 - model selection should consider predictive quality together with computational cost, complexity, inference requirements, and maintainability
 
-For this particular experiment, **LinearSVC provides the strongest overall predictive result, while Self-Attention provides the strongest neural result and the most interesting contextual modeling capability.**
+For this experiment, **LinearSVC provides the strongest overall held-out F1, while Self-Attention provides the strongest neural F1.**
 
-The deeper model-by-model analysis, training behavior, attention observations, and error-analysis findings are documented in:
+The deeper model-by-model analysis, training behavior, attention observations, implementation-correction impact, and experiment limitations are documented in:
 
 [`docs/experiment_analysis.md`](docs/experiment_analysis.md)
+
 
 ## Documentation
 
@@ -999,13 +982,13 @@ This project was designed primarily as an experimental and educational NLP codeb
 
 Several limitations are therefore intentional and provide useful directions for future work.
 
-### Neural Results Can Vary Between Runs
+### Neural Variance Has Not Been Measured Across Random Seeds
 
-Neural-network training involves stochastic processes such as parameter initialization and mini-batch optimization.
+Neural-network training can involve stochastic effects from parameter initialization, mini-batch ordering, hardware behavior, and related factors.
 
-As a result, exact neural metrics may vary slightly between executions even when the overall experiment configuration remains unchanged.
+The finalized neural experiment was executed twice under the same tested configuration and reproduced the same evaluation metrics and epoch-level training losses. However, these runs were not a controlled multi-seed study.
 
-The reported neural results should therefore be interpreted as representative results from the completed experiment rather than as guarantees of identical scores on every run.
+Repeated experiments across multiple random seeds would be needed to estimate mean performance, variance, and the statistical stability of small differences such as the `0.0019` F1 gap between Self-Attention and LSTM.
 
 ---
 
@@ -1216,7 +1199,7 @@ These experiments would allow stronger conclusions about why individual architec
 
 ### Regularization and Early Stopping
 
-The BiLSTM + FastText experiment achieved very low training loss without a corresponding improvement in held-out F1.
+BiLSTM + FastText and LSTM achieved very low final training losses without outperforming Self-Attention on held-out F1.
 
 Future experiments could investigate techniques such as:
 
@@ -1314,7 +1297,7 @@ The repository extends that work by reorganizing the experiment into a modular a
 
 ### Dataset
 
-The sentiment-classification experiments use the **Stanford IMDb Large Movie Review Dataset**, originally introduced for research on learning word vectors for sentiment analysis.
+The sentiment-classification experiments use the **[Stanford IMDb Large Movie Review Dataset](https://ai.stanford.edu/~amaas/data/sentiment/)**, introduced by Maas et al. in *Learning Word Vectors for Sentiment Analysis*.
 
 ### Libraries and Ecosystem
 
@@ -1323,7 +1306,7 @@ The implementation builds on open-source tools including:
 - PyTorch
 - scikit-learn
 - Hugging Face Datasets
-- FastText
+- [FastText](https://fasttext.cc/)
 - NumPy
 - pandas
 - Matplotlib
@@ -1363,3 +1346,7 @@ Documented Results and Analysis
 The core experiment pipeline is implemented and validated.
 
 Potential later versions may extend the project toward inference, containerization, CI/CD, cloud deployment, experiment tracking, and lightweight MLOps while keeping the existing experimentation layer intact.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

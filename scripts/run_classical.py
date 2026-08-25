@@ -59,7 +59,6 @@ from src.validation import (
     select_balanced_subset,
 )
 
-
 # ---------------------------------------------------------------------
 # Smoke-test configuration
 # ---------------------------------------------------------------------
@@ -281,7 +280,8 @@ def save_experiment_artifacts(
     total_runtime_minutes,
     metrics_dir,
     report_dir,
-    smoke_test
+    smoke_test,
+    experiment_metadata
 ):
     """
     Persist CSV, JSON, and human-readable experiment reports.
@@ -298,7 +298,8 @@ def save_experiment_artifacts(
     save_comparison_json(
         all_results,
         json_path,
-        total_runtime_minutes
+        total_runtime_minutes,
+        metadata=experiment_metadata
     )
 
     save_experiment_report(
@@ -430,6 +431,14 @@ def main():
     # 3. Define experiments
     # -----------------------------------------------------------------
 
+    experiment_metadata = {
+        "run_type": "smoke" if args.smoke_test else "full",
+        "train_samples": len(train_texts_clean),
+        "test_samples": len(test_texts_clean),
+        "cv_folds": SMOKE_CV_FOLDS if args.smoke_test else 5,
+        "scoring": "f1",
+        "model_random_state": 42
+    }
     experiments = [
         ("Logistic Regression", create_logistic_regression_search()),
         ("Bernoulli Naive Bayes", create_naive_bayes_search()),
@@ -503,7 +512,8 @@ def main():
         total_runtime_minutes,
         metrics_dir,
         report_dir,
-        args.smoke_test
+        args.smoke_test,
+        experiment_metadata
     )
 
     # -----------------------------------------------------------------
